@@ -1,0 +1,10 @@
+DONE - alignement automatique
+DONE - palette mieux organisée, par types
+DONE - nettoyer les propriétés inutiles des "portes"
+- liens non sélectionnables à l'intérieur des containers
+- le mode view ne devrait pas permettre de bouger des éléments
+- ajouter l'ouverture de lien aux clics sur des éléments en mode view
+- ajouter des icônes: ubuntu, mini-PC, livebox, internet, protocols
+- permettre que toutes les icônes soient sauvegardées en local
+DONE - permettre multi-sélection
+- image docker
