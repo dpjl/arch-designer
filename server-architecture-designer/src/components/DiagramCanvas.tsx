@@ -388,6 +388,10 @@ function DiagramCanvas() {
   .react-flow__edge text.react-flow__edge-text { font-family: system-ui, Inter, sans-serif; font-size:11px; font-weight:600; letter-spacing:0.25px; fill:#334155; }
   .react-flow__edge:hover text.react-flow__edge-text { fill:#0f172a; }
   .react-flow__edge.selected text.react-flow__edge-text { fill:#1e3a8a; }
+  .dark .react-flow__edge .react-flow__edge-textbg { fill: rgba(15,23,42,0.72); stroke: rgba(100,116,139,0.35); }
+  .dark .react-flow__edge text.react-flow__edge-text { fill:#cbd5e1; }
+  .dark .react-flow__edge:hover text.react-flow__edge-text { fill:#e2e8f0; }
+  .dark .react-flow__edge.selected text.react-flow__edge-text { fill:#3b82f6; }
 
       /* Firewall ring uses a tiled PNG brick texture set via CSS var --fwtex */
   .firewall-ring { position:absolute; inset:-8px; border-radius:1.35rem; pointer-events:none; z-index:1; }
@@ -395,12 +399,13 @@ function DiagramCanvas() {
         position:absolute; background-repeat:repeat; background-size: var(--fwtexSize, 16px 16px);
       }
       .firewall-ring .fw-badge {
-        position:absolute; top:-18px; left:-18px; height:42px; width:42px; border-radius:9999px;
-        display:flex; align-items:center; justify-content:center; font-size:20px; line-height:1;
-        background:#fff7ed; color:#111827; border:3px solid #000000;
-        box-shadow:0 4px 12px rgba(0,0,0,0.35);
-        pointer-events:none;
+        position:absolute; top:-18px; left:-18px; height:40px; width:40px; border-radius:9999px;
+        display:flex; align-items:center; justify-content:center; font-size:18px; line-height:1;
+        background:#fff7ed; color:#111827; border:2px solid #0f172a;
+        box-shadow:0 3px 8px rgba(0,0,0,0.3);
+        pointer-events:none; backdrop-filter: blur(2px);
       }
+      .dark .firewall-ring .fw-badge { background:rgba(251,146,60,0.18); color:#fcd9b6; border:2px solid #f59e0b; box-shadow:0 0 0 1px rgba(255,255,255,0.04), 0 4px 10px -2px rgba(0,0,0,0.6); }
   /* Inner gap from element border + centered bricks within ring */
   .firewall-ring .fw-top { top: calc(var(--ringGapInner, 2px) * -1); left:0; right:0; height: var(--ringThickness, 8px); border-top-left-radius:1.35rem; border-top-right-radius:1.35rem; background-image: var(--fwtexH); background-position: var(--fwtexOffX, 0) calc(var(--fwShiftTopY, 0)); }
   .firewall-ring .fw-bottom { bottom: calc(var(--ringGapInner, 2px) * -1); left:0; right:0; height: var(--ringThickness, 8px); border-bottom-left-radius:1.35rem; border-bottom-right-radius:1.35rem; background-image: var(--fwtexH); background-position: var(--fwtexOffX, 0) calc(var(--fwShiftTopY, 0)); }
