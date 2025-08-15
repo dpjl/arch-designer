@@ -20,7 +20,7 @@ export interface PropertiesPanelProps {
 }
 
 const SectionTitle: React.FC<React.PropsWithChildren> = ({ children }) => (
-  <h4 className="text-xs font-medium text-slate-600 mb-2 uppercase tracking-wide">{children}</h4>
+  <h4 className="text-xs font-medium text-slate-600 dark:text-slate-300 mb-2 uppercase tracking-wide">{children}</h4>
 );
 
 function NetworksInlineEditor({ selection, onChange, networks }: any) {
@@ -45,33 +45,33 @@ const DEFAULT_DOOR_WIDTH = 140;
 export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({ selection, onChange, onDelete, onClosePanel, multiCount, onDeleteSelected, networks }) => {
   if ((multiCount || 0) > 1) {
     return (
-      <Card className="rounded-2xl text-[13px]">
+  <Card className="rounded-2xl text-[13px] bg-white/80 dark:bg-slate-800/80 backdrop-blur border border-slate-200 dark:border-slate-600 dark:shadow-[0_0_0_1px_rgba(255,255,255,0.05)]">
         <CardHeader>
           <div className="flex items-center justify-between">
             <CardTitle className="text-base">Multiple selection</CardTitle>
             {onClosePanel && (
-              <button onClick={onClosePanel} className="text-xs px-2 py-1 rounded-md bg-slate-100 hover:bg-slate-200 transition-colors" title="Masquer le panneau">▶</button>
+              <button onClick={onClosePanel} className="text-xs px-2 py-1 rounded-md bg-slate-100 hover:bg-slate-200 dark:bg-slate-700 dark:hover:bg-slate-600 transition-colors" title="Masquer le panneau">▶</button>
             )}
           </div>
         </CardHeader>
         <CardContent className="space-y-3">
-          <div className="text-sm text-slate-600">{multiCount} éléments sélectionnés.</div>
+          <div className="text-sm text-slate-600 dark:text-slate-300">{multiCount} éléments sélectionnés.</div>
           <div className="flex gap-2">
             <Button variant="destructive" onClick={onDeleteSelected} className="rounded-md"><Trash2 className="h-4 w-4 mr-2"/>Supprimer</Button>
           </div>
-          <div className="text-[11px] text-slate-500">Maj+clic pour ajouter/retirer. Glisser un cadre pour sélectionner une zone.</div>
+          <div className="text-[11px] text-slate-500 dark:text-slate-400">Maj+clic pour ajouter/retirer. Glisser un cadre pour sélectionner une zone.</div>
         </CardContent>
       </Card>
     );
   }
   if (!selection) {
     return (
-      <Card className="rounded-2xl">
+  <Card className="rounded-2xl bg-white/80 dark:bg-slate-800/80 backdrop-blur border border-slate-200 dark:border-slate-600 dark:shadow-[0_0_0_1px_rgba(255,255,255,0.05)]">
         <CardHeader>
           <div className="flex items-center justify-between">
             <CardTitle className="text-base">No selection</CardTitle>
             {onClosePanel && (
-              <button onClick={onClosePanel} className="text-xs px-2 py-1 rounded-md bg-slate-100 hover:bg-slate-200 transition-colors" title="Masquer le panneau">▶</button>
+              <button onClick={onClosePanel} className="text-xs px-2 py-1 rounded-md bg-slate-100 hover:bg-slate-200 dark:bg-slate-700 dark:hover:bg-slate-600 transition-colors" title="Masquer le panneau">▶</button>
             )}
           </div>
         </CardHeader>
@@ -86,12 +86,12 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({ selection, onC
   const isNetwork = isNode && selection.nodeType === 'network';
 
   return (
-    <Card className="rounded-2xl text-[13px]">
+  <Card className="rounded-2xl text-[13px] bg-white/80 dark:bg-slate-800/80 backdrop-blur border border-slate-200 dark:border-slate-600 dark:shadow-[0_0_0_1px_rgba(255,255,255,0.05)]">
       <CardHeader>
         <div className="flex items-center justify-between">
           <CardTitle className="text-base">{isNode ? 'Node' : 'Edge'} properties</CardTitle>
           {onClosePanel && (
-            <button onClick={onClosePanel} className="text-xs px-2 py-1 rounded-md bg-slate-100 hover:bg-slate-200 transition-colors" title="Masquer le panneau">▶</button>
+            <button onClick={onClosePanel} className="text-xs px-2 py-1 rounded-md bg-slate-100 hover:bg-slate-200 dark:bg-slate-700 dark:hover:bg-slate-600 transition-colors" title="Masquer le panneau">▶</button>
           )}
         </div>
       </CardHeader>
@@ -164,10 +164,10 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({ selection, onC
               <div className="space-y-1">
                 <SectionTitle>Features</SectionTitle>
                 <div className="flex items-center gap-2">
-                  <button type="button" title="Auth simple" onClick={() => onChange({ data:{ ...selection.data, features: exclusiveAuthToggle(selection.data.features, 'auth1', !selection.data.features?.auth1) } })} className={`h-9 w-9 rounded-lg border flex items-center justify-center bg-white hover:bg-slate-50 ${selection.data.features?.auth1 ? 'ring-2 ring-blue-500 border-blue-400' : 'border-slate-200'}`}>🔑</button>
-                  <button type="button" title="Auth double" onClick={() => onChange({ data:{ ...selection.data, features: exclusiveAuthToggle(selection.data.features, 'auth2', !selection.data.features?.auth2) } })} className={`h-9 w-9 rounded-lg border flex items-center justify-center bg-white hover:bg-slate-50 ${selection.data.features?.auth2 ? 'ring-2 ring-blue-500 border-blue-400' : 'border-slate-200'}`}>🔑🔑</button>
-                  <button type="button" title="Sablier" onClick={() => onChange({ data:{ ...selection.data, features: { ...(selection.data.features||{}), hourglass: !selection.data.features?.hourglass } } })} className={`h-9 w-9 rounded-lg border flex items-center justify-center bg-white hover:bg-slate-50 ${selection.data.features?.hourglass ? 'ring-2 ring-blue-500 border-blue-400' : 'border-slate-200'}`}>⏳</button>
-                  <button type="button" title="Firewall" onClick={() => onChange({ data:{ ...selection.data, features: { ...(selection.data.features||{}), firewall: !selection.data.features?.firewall } } })} className={`h-9 w-9 rounded-lg border flex items-center justify-center bg-white hover:bg-slate-50 ${selection.data.features?.firewall ? 'ring-2 ring-red-500 border-red-400' : 'border-slate-200'}`}>🛡️</button>
+                  <button type="button" title="Auth simple" onClick={() => onChange({ data:{ ...selection.data, features: exclusiveAuthToggle(selection.data.features, 'auth1', !selection.data.features?.auth1) } })} className={`h-9 w-9 rounded-lg border flex items-center justify-center bg-white hover:bg-slate-50 dark:bg-slate-700 dark:hover:bg-slate-600 ${selection.data.features?.auth1 ? 'ring-2 ring-blue-500 border-blue-400 dark:ring-blue-400 dark:border-blue-400' : 'border-slate-200 dark:border-slate-500'}`}>🔑</button>
+                  <button type="button" title="Auth double" onClick={() => onChange({ data:{ ...selection.data, features: exclusiveAuthToggle(selection.data.features, 'auth2', !selection.data.features?.auth2) } })} className={`h-9 w-9 rounded-lg border flex items-center justify-center bg-white hover:bg-slate-50 dark:bg-slate-700 dark:hover:bg-slate-600 ${selection.data.features?.auth2 ? 'ring-2 ring-blue-500 border-blue-400 dark:ring-blue-400 dark:border-blue-400' : 'border-slate-200 dark:border-slate-500'}`}>🔑🔑</button>
+                  <button type="button" title="Sablier" onClick={() => onChange({ data:{ ...selection.data, features: { ...(selection.data.features||{}), hourglass: !selection.data.features?.hourglass } } })} className={`h-9 w-9 rounded-lg border flex items-center justify-center bg-white hover:bg-slate-50 dark:bg-slate-700 dark:hover:bg-slate-600 ${selection.data.features?.hourglass ? 'ring-2 ring-blue-500 border-blue-400 dark:ring-blue-400 dark:border-blue-400' : 'border-slate-200 dark:border-slate-500'}`}>⏳</button>
+                  <button type="button" title="Firewall" onClick={() => onChange({ data:{ ...selection.data, features: { ...(selection.data.features||{}), firewall: !selection.data.features?.firewall } } })} className={`h-9 w-9 rounded-lg border flex items-center justify-center bg-white hover:bg-slate-50 dark:bg-slate-700 dark:hover:bg-slate-600 ${selection.data.features?.firewall ? 'ring-2 ring-red-500 border-red-400 dark:ring-red-400 dark:border-red-400' : 'border-slate-200 dark:border-slate-500'}`}>🛡️</button>
                 </div>
               </div>
             )}
@@ -178,7 +178,7 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({ selection, onC
                   {(selection.data.instances || []).map((ins: any, idx: number) => {
                     const auth = ins?.auth as ('auth1'|'auth2'|undefined);
                     return (
-                      <div key={idx} className="p-2 rounded-md border bg-white space-y-1.5">
+                      <div key={idx} className="p-2 rounded-md border bg-white dark:bg-slate-700/60 dark:border-slate-600 space-y-1.5">
                         <div className="flex items-center justify-between gap-2">
                           <span className="text-[10px] uppercase tracking-wide text-slate-500">Instance ID</span>
                           <span className="text-[10px] text-slate-400">#{idx+1}</span>
@@ -269,12 +269,12 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({ selection, onC
             {!isDoor && isNode && (
               <div className="space-y-1">
                 <SectionTitle>Icône</SectionTitle>
-                <div className="grid grid-cols-5 gap-2 max-h-44 overflow-y-auto p-2 rounded border bg-slate-50/50">
+                <div className="grid grid-cols-5 gap-2 max-h-44 overflow-y-auto p-2 rounded border bg-slate-50/50 dark:bg-slate-700/30 dark:border-slate-600 [scrollbar-width:thin]">
                   {CATALOG.map(c => {
                     const active = selection.data.icon === c.icon;
                     return (
                       <div key={c.id} className="group relative">
-                        <button type="button" onClick={() => onChange({ data: { ...selection.data, icon: c.icon } })} className={`h-10 w-10 rounded-xl border bg-white/80 hover:bg-white hover:shadow-md transition-all duration-200 flex items-center justify-center p-1 ${active ? 'ring-2 ring-blue-500 border-blue-400' : 'border-slate-200'}`}>
+                        <button type="button" onClick={() => onChange({ data: { ...selection.data, icon: c.icon } })} className={`h-10 w-10 rounded-xl border bg-white/80 dark:bg-slate-800/70 hover:bg-white dark:hover:bg-slate-700 hover:shadow-md transition-all duration-200 flex items-center justify-center p-1 ${active ? 'ring-2 ring-blue-500 border-blue-400 dark:ring-blue-400 dark:border-blue-400' : 'border-slate-200 dark:border-slate-600'}`}>
                           <img src={c.icon} alt="" className="h-8 w-8 object-contain" />
                         </button>
                         <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-2 py-1 bg-slate-900/90 text-white text-xs rounded-md opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-10">

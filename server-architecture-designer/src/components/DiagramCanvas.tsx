@@ -27,6 +27,7 @@ import ReactFlow, {
 import "reactflow/dist/style.css";
 import { Button } from "@/components/ui/button";
 import { Toolbar, PropertiesPanel, PalettePanel, ComponentNode, DoorNode, NetworkNode, MODES, GRID_SIZE, CONTAINER_HEADER_HEIGHT, NETWORK_HEADER_HEIGHT, DEFAULT_DOOR_WIDTH, DEFAULT_DOOR_HEIGHT, HISTORY_STORAGE_KEY, SNAP_STORAGE_KEY, hexToRgba, autoTextColor, isAncestor } from './diagram';
+import { ThemeProvider } from './theme/ThemeProvider';
 import { useDiagramHistory } from './diagram/hooks/useDiagramHistory';
 import { useDiagramSelection } from './diagram/hooks/useDiagramSelection';
 import { applyZIndexHierarchy, enforceContainerSelectedZ, absolutePosition, headerOffsetFor as headerOffsetForUtil } from './diagram/layout-utils';
@@ -368,6 +369,10 @@ function DiagramCanvas() {
   /* Elevate edges above nodes (user request) */
   .react-flow__edges { z-index: 50 !important; }
   .react-flow__nodes { z-index: 10 !important; }
+  /* Dark mode grid softening */
+  .dark .react-flow__background.react-flow__background-lines line { stroke: rgba(255,255,255,0.06); }
+  .dark .react-flow__background.react-flow__background-lines pattern line { stroke: rgba(255,255,255,0.06); }
+  .dark .react-flow__background { background: linear-gradient(to bottom, #0f172a, #020617); }
   /* Preserve node interactivity: edge paths keep pointer-events default (stroke) */
 
   /* Improved edge label styling */
@@ -905,7 +910,8 @@ function DiagramCanvas() {
   }, [setNodes]);
 
   return (
-    <div className="h-screen w-full bg-gradient-to-b from-slate-50 to-slate-100">
+    <ThemeProvider>
+  <div className="h-screen w-full bg-gradient-to-b from-slate-50 to-slate-100 dark:from-slate-950 dark:to-slate-900 text-slate-800 dark:text-slate-100 selection:bg-slate-900/80 selection:text-white dark:selection:bg-slate-100/20 dark:selection:text-slate-100">
       <EdgePatternStyles />
       <TooltipProvider>
         {historyFlash && (
@@ -916,7 +922,7 @@ function DiagramCanvas() {
             </div>
           </div>
         )}
-    <div className="h-16 px-2 sm:px-4 border-b bg-white/70 backdrop-blur flex items-center gap-3 justify-between sticky top-0 z-50">
+  <div className="h-16 px-2 sm:px-4 border-b bg-white/70 dark:bg-slate-900/70 backdrop-blur flex items-center gap-3 justify-between sticky top-0 z-50 shadow-sm dark:shadow-[0_1px_0_0_rgba(255,255,255,0.05)]">
           <div className="flex items-center gap-3">
             <div className="h-9 w-9 rounded-2xl bg-slate-900 text-white flex items-center justify-center shadow"><LayoutGrid className="h-5 w-5"/></div>
       <div className="text-base sm:text-lg font-semibold truncate max-w-[40vw]">Server Architecture Designer</div>
@@ -960,9 +966,9 @@ function DiagramCanvas() {
 
           {/* Canvas */}
           <div className="flex-1 min-w-0 relative">
-            <Card className="rounded-2xl h-full">
+      <Card className="rounded-2xl h-full bg-white/80 dark:bg-slate-900/55 backdrop-blur border border-slate-200 dark:border-slate-700 dark:shadow-[0_0_0_1px_rgba(255,255,255,0.04)]">
               <CardContent className="h-full p-0">
-                <div ref={reactFlowWrapper} className={`h-full ${viewLocked ? "pointer-events-auto" : ""}`}>
+        <div ref={reactFlowWrapper} className={`h-full ${viewLocked ? "pointer-events-auto" : ""} reactflow-surface dark:[&_.react-flow__attribution]:bg-transparent`}>
                   <ReactFlow
                     nodes={nodes}
                     edges={edges}
@@ -986,9 +992,9 @@ function DiagramCanvas() {
                     selectNodesOnDrag
                     fitView
                   >
-                    <MiniMap pannable zoomable className="!rounded-xl !bg-white/80" nodeStrokeWidth={1} nodeColor={miniMapNodeColorFn} />
+                    <MiniMap pannable zoomable className="!rounded-xl !bg-white/80 dark:!bg-slate-800/65 !backdrop-blur !border border-slate-200/60 dark:!border-slate-600/60" nodeStrokeWidth={1} nodeColor={miniMapNodeColorFn} />
                     <Controls showInteractive={false} className="!rounded-xl" />
-                    <Background variant={BackgroundVariant.Lines} gap={24} />
+                    <Background variant={BackgroundVariant.Lines} gap={24} className="stroke-slate-200 dark:stroke-slate-700" />
                   </ReactFlow>
                 </div>
               </CardContent>
@@ -1020,7 +1026,7 @@ function DiagramCanvas() {
           </div>
           {/* Mobile overlays */}
           {showLeftPanel && (
-            <div className="md:hidden absolute inset-0 z-40 bg-white/95 backdrop-blur-sm overflow-y-auto p-4">
+            <div className="md:hidden absolute inset-0 z-40 bg-white/95 dark:bg-slate-900/95 backdrop-blur-sm overflow-y-auto p-4">
               <div className="flex items-center justify-between mb-4">
                 <h2 className="font-semibold text-sm">Palette</h2>
                 <button onClick={()=>setShowLeftPanel(false)} className="text-xs px-2 py-1 rounded bg-slate-200">Fermer</button>
@@ -1029,7 +1035,7 @@ function DiagramCanvas() {
             </div>
           )}
           {showRightPanel && (
-            <div className="lg:hidden absolute inset-0 z-40 bg-white/95 backdrop-blur-sm overflow-y-auto p-4">
+            <div className="lg:hidden absolute inset-0 z-40 bg-white/95 dark:bg-slate-900/95 backdrop-blur-sm overflow-y-auto p-4">
               <div className="flex items-center justify-between mb-4">
                 <h2 className="font-semibold text-sm">Propriétés</h2>
                 <button onClick={()=>setShowRightPanel(false)} className="text-xs px-2 py-1 rounded bg-slate-200">Fermer</button>
@@ -1039,7 +1045,8 @@ function DiagramCanvas() {
           )}
         </div>
       </TooltipProvider>
-    </div>
+  </div>
+  </ThemeProvider>
   );
 }
 

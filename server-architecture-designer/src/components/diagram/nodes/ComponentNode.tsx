@@ -101,15 +101,15 @@ const ComponentNode = memo(({ id, data, selected, isConnectable }: ComponentNode
           </div>
         )}
         <div className={`rounded-2xl overflow-hidden relative ${selected ? 'container-sel' : ''}`} style={{ width: '100%', height: '100%', border: `1px solid ${borderColor}`, background: bg, paddingTop: CONTAINER_HEADER_HEIGHT }}>
-          <div className="absolute top-0 left-0 right-0 flex items-center gap-3 px-3 py-2 bg-white/90 border-b" style={{ borderColor: borderColor, height: CONTAINER_HEADER_HEIGHT }}>
+          <div className="absolute top-0 left-0 right-0 flex items-center gap-3 px-3 py-2 bg-white/90 dark:bg-slate-900/70 backdrop-blur border-b" style={{ borderColor: borderColor, height: CONTAINER_HEADER_HEIGHT }}>
             {icon ? (
-              <div className="h-8 w-8 rounded-xl bg-white/70 border flex items-center justify-center overflow-hidden shadow-sm">
+              <div className="h-8 w-8 rounded-xl bg-white/70 dark:bg-slate-800/70 border flex items-center justify-center overflow-hidden shadow-sm">
                 <img src={icon} alt="" className="max-h-7 max-w-7 object-contain" />
               </div>
             ) : (
               <Boxes className="h-5 w-5" />
             )}
-            <div className="font-semibold text-gray-800 truncate" title={label}>{label}</div>
+            <div className="font-semibold text-gray-800 dark:text-slate-100 truncate" title={label}>{label}</div>
             <div className="ml-auto flex items-center gap-2 text-xs text-slate-600">
               <FeaturesIcons features={features} compact />
               {locked ? <Lock className="h-3.5 w-3.5"/> : <Unlock className="h-3.5 w-3.5"/>}
@@ -139,7 +139,7 @@ const ComponentNode = memo(({ id, data, selected, isConnectable }: ComponentNode
           <div className="fw-badge" title="Firewall activé" aria-label="firewall">🛡️</div>
         </div>
       )}
-      <div className="group rounded-2xl shadow-lg px-2 py-1 w-[240px] hover:shadow-xl transition overflow-visible border relative" style={{ borderColor, background: bg }}>
+  <div className="group rounded-2xl shadow-lg px-2 py-1 w-[240px] hover:shadow-xl transition overflow-visible border relative dark:shadow-slate-950/40" style={{ borderColor, background: bg }}>
         {Array.isArray(data?.networkColors) && data.networkColors.length > 0 && (
           <div className="absolute left-0 right-0 top-0 h-1.5 flex overflow-hidden rounded-t-2xl">
             {data.networkColors.slice(0,8).map((c:string, i:number) => (<div key={i} className="flex-1" style={{ background: c }} />))}
@@ -152,8 +152,8 @@ const ComponentNode = memo(({ id, data, selected, isConnectable }: ComponentNode
         <Handle type="target" position={Position.Left} className={`handle-lg !bg-gray-500/80 transition-opacity ${selected ? 'opacity-100' : 'opacity-0'}`} isConnectable={isConnectable} />
         <Handle type="source" position={Position.Right} className={`handle-lg !bg-gray-500/80 transition-opacity ${selected ? 'opacity-100' : 'opacity-0'}`} isConnectable={isConnectable} />
         <div className="flex items-center gap-2 min-w-0">
-          {icon ? <img src={icon} alt="" className="h-7 w-7 object-contain rounded" /> : <div className="h-7 w-7 rounded bg-gray-200" />}
-          {showText && <div className="font-medium text-sm truncate flex-1" title={label || 'Unnamed'}>{label || 'Unnamed'}</div>}
+          {icon ? <img src={icon} alt="" className="h-7 w-7 object-contain rounded" /> : <div className="h-7 w-7 rounded bg-gray-200 dark:bg-slate-600" />}
+          {showText && <div className="font-medium text-sm truncate flex-1 text-slate-800 dark:text-slate-100" title={label || 'Unnamed'}>{label || 'Unnamed'}</div>}
           <span className="inline-block h-2 w-2 rounded-full flex-shrink-0" style={{ background: borderColor }} />
           <FeaturesIcons features={features} compact={!showText} />
         </div>
