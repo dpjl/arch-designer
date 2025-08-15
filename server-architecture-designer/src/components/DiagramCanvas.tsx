@@ -27,6 +27,7 @@ import ReactFlow, {
 import "reactflow/dist/style.css";
 import { Button } from "@/components/ui/button";
 import { Toolbar, PropertiesPanel, PalettePanel, ComponentNode, DoorNode, NetworkNode, MODES, GRID_SIZE, CONTAINER_HEADER_HEIGHT, NETWORK_HEADER_HEIGHT, DEFAULT_DOOR_WIDTH, DEFAULT_DOOR_HEIGHT, HISTORY_STORAGE_KEY, SNAP_STORAGE_KEY, hexToRgba, autoTextColor, isAncestor } from './diagram';
+import { useDiagramHistory } from './diagram/hooks/useDiagramHistory';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Trash2, Link2, Palette, Lock, Unlock, LayoutGrid, Boxes } from "lucide-react";
 import * as htmlToImage from 'html-to-image';
@@ -270,33 +271,12 @@ function DiagramCanvas() {
   const reactFlowWrapper = useRef<HTMLDivElement | null>(null);
   const { project } = useReactFlow();
   const [mode, setMode] = useState<typeof MODES[keyof typeof MODES]>(MODES.EDIT);
-  // History (undo/redo) with batching + persistence + flash indicator
-  type Snapshot = { nodes: any[]; edges: any[] };
-  const historyRef = useRef<{ past: Snapshot[]; present: Snapshot; future: Snapshot[] }>({ past: [], present: { nodes: [], edges: [] }, future: [] });
-  const [historyTick, setHistoryTick] = useState(0);
-  const lastCommitRef = useRef<number>(Date.now());
+  // History (refactored using hook) - will be initialized after nodes/edges state
   const [historyFlash, setHistoryFlash] = useState<string | null>(null);
-  const COMMIT_GROUP_MS = 500;
-  const HISTORY_STORAGE_KEY = "server-arch:history";
   const showFlash = useCallback((msg: string) => { setHistoryFlash(msg); setTimeout(() => setHistoryFlash(c => c === msg ? null : c), 900); }, []);
-  useEffect(()=>{ (window as any).__showFlash = showFlash; },[showFlash]);
 
   // Load persisted history once
-  useEffect(() => {
-    try {
-      const raw = localStorage.getItem(HISTORY_STORAGE_KEY);
-      if (raw) {
-        const parsed = JSON.parse(raw);
-        if (parsed?.present?.nodes && Array.isArray(parsed.past) && Array.isArray(parsed.future)) {
-          historyRef.current = parsed;
-          setNodes(parsed.present.nodes);
-          setEdges(parsed.present.edges);
-          lastCommitRef.current = Date.now();
-        }
-      }
-    } catch (_) { /* ignore */ }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  useEffect(()=>{ try{ const raw= localStorage.getItem(HISTORY_STORAGE_KEY); if(raw){ const parsed=JSON.parse(raw); if(parsed?.present?.nodes){ historyRef.current=parsed; setNodes(parsed.present.nodes); setEdges(parsed.present.edges); lastCommitRef.current=Date.now(); } } } catch{} },[]);
 
   // Initial graph
   const initialNodes = useMemo(
@@ -321,6 +301,8 @@ function DiagramCanvas() {
   // expose setter for resize handles inside node components
   useEffect(() => { (window as any).__setDiagramNodes = setNodes; (window as any).__getDiagramNodes = () => nodes; }, [setNodes, nodes]);
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges as any);
+  const { historyRef, lastCommitRef, commitIfChanged, undo, redo } = useDiagramHistory(setNodes, setEdges, showFlash);
+  useEffect(()=>{ (window as any).__showFlash = showFlash; },[showFlash]);
   const [selection, setSelection] = useState<any>(null);
   // Networks present in the diagram (derived from nodes; stable IDs)
   type Network = { id: string; label: string; color: string };
@@ -345,32 +327,8 @@ function DiagramCanvas() {
     const same = present.length === networks.length && present.every((p, i) => p.id === networks[i]?.id && p.label === networks[i]?.label && p.color === networks[i]?.color);
     if (!same) setNetworks(present);
   }, [nodes]);
-  // Init present once
-  useEffect(() => { if (historyRef.current.present.nodes.length === 0 && nodes.length) { historyRef.current.present = { nodes: JSON.parse(JSON.stringify(nodes)), edges: JSON.parse(JSON.stringify(edges)) }; lastCommitRef.current = Date.now(); } }, [nodes, edges]);
-  // Track changes with batching
-  useEffect(() => {
-    const cur: Snapshot = { nodes, edges };
-    const ser = JSON.stringify(cur);
-    const presSer = JSON.stringify(historyRef.current.present);
-    if (ser !== presSer) {
-      const now = Date.now();
-      const elapsed = now - lastCommitRef.current;
-      if (elapsed < COMMIT_GROUP_MS && historyRef.current.past.length) {
-        // batch update current present only
-        historyRef.current.present = { nodes: JSON.parse(JSON.stringify(nodes)), edges: JSON.parse(JSON.stringify(edges)) };
-      } else {
-        historyRef.current.past.push(historyRef.current.present);
-        if (historyRef.current.past.length > 100) historyRef.current.past.shift();
-        historyRef.current.present = { nodes: JSON.parse(JSON.stringify(nodes)), edges: JSON.parse(JSON.stringify(edges)) };
-        historyRef.current.future = [];
-        lastCommitRef.current = now;
-      }
-      setHistoryTick(t=>t+1);
-      try { localStorage.setItem(HISTORY_STORAGE_KEY, JSON.stringify(historyRef.current)); } catch(_){}
-    }
-  }, [nodes, edges]);
-  const undo = useCallback(()=>{ const h=historyRef.current; if(!h.past.length) return; const prev = h.past.pop() as Snapshot; h.future.unshift(h.present); h.present = prev; setNodes(prev.nodes.map(n=>({...n}))); setEdges(prev.edges.map(e=>({...e}))); setSelection(null); lastCommitRef.current = Date.now(); setHistoryTick(t=>t+1); try { localStorage.setItem(HISTORY_STORAGE_KEY, JSON.stringify(h)); } catch(_){} showFlash('Undo'); },[setNodes,setEdges,showFlash]);
-  const redo = useCallback(()=>{ const h=historyRef.current; if(!h.future.length) return; const next = h.future.shift() as Snapshot; h.past.push(h.present); h.present = next; setNodes(next.nodes.map(n=>({...n}))); setEdges(next.edges.map(e=>({...e}))); setSelection(null); lastCommitRef.current = Date.now(); setHistoryTick(t=>t+1); try { localStorage.setItem(HISTORY_STORAGE_KEY, JSON.stringify(h)); } catch(_){} showFlash('Redo'); },[setNodes,setEdges,showFlash]);
+  // Track changes
+  useEffect(()=>{ commitIfChanged(nodes, edges); }, [nodes, edges, commitIfChanged]);
   useEffect(()=>{ const handler=(e:KeyboardEvent)=>{ if((e.ctrlKey||e.metaKey)&&!e.shiftKey&&e.key.toLowerCase()==='z'){ e.preventDefault(); undo(); } else if((e.ctrlKey||e.metaKey)&&(e.key.toLowerCase()==='y'||(e.shiftKey&&e.key.toLowerCase()==='z'))){ e.preventDefault(); redo(); } }; window.addEventListener('keydown', handler); return ()=> window.removeEventListener('keydown', handler); },[undo,redo]);
   // Delete key support (Delete/Backspace)
   useEffect(() => {
