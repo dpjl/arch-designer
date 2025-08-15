@@ -8,6 +8,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Trash2 } from 'lucide-react';
 import { CATALOG } from '@/lib/catalog';
 import { autoTextColor } from '@/lib/utils';
+import { isAuto } from './color-utils';
 
 export interface PropertiesPanelProps {
   selection: any;
@@ -144,16 +145,24 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({ selection, onC
             {!isDoor && !isNetwork && (
               <div className="space-y-1">
                 <SectionTitle>Couleurs</SectionTitle>
-                <div className="flex items-center gap-2">
-                  <div className="flex flex-col items-center gap-1">
-                    <span className="text-[10px] text-muted-foreground">Bord</span>
-                    <Input type="color" className="h-8 w-8 p-1" value={selection.data.color || '#94a3b8'} onChange={(e) => onChange({ data: { ...selection.data, color: e.target.value } })} />
+                <div className="flex flex-col gap-2">
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1">
+                      <span className="text-[10px] text-muted-foreground">Bord</span>
+                      <div className="flex items-center gap-1">
+                        <button type="button" onClick={()=> onChange({ data:{ ...selection.data, color: 'auto' } })} className={`px-2 h-8 rounded-md text-[10px] border ${isAuto(selection.data.color)?'bg-blue-500 text-white border-blue-500':'bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600'}`}>Auto</button>
+                        <Input type="color" className="h-8 w-9 p-1" value={isAuto(selection.data.color)? '#94a3b8' : selection.data.color} onChange={(e) => onChange({ data: { ...selection.data, color: e.target.value } })} />
+                      </div>
+                    </div>
+                    <div className="space-y-1">
+                      <span className="text-[10px] text-muted-foreground">Fond</span>
+                      <div className="flex items-center gap-1">
+                        <button type="button" onClick={()=> onChange({ data:{ ...selection.data, bgColor: 'auto' } })} className={`px-2 h-8 rounded-md text-[10px] border ${isAuto(selection.data.bgColor)?'bg-blue-500 text-white border-blue-500':'bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600'}`}>Auto</button>
+                        <Input type="color" className="h-8 w-9 p-1" value={isAuto(selection.data.bgColor)? '#ffffff' : selection.data.bgColor} onChange={(e) => onChange({ data: { ...selection.data, bgColor: e.target.value } })} />
+                      </div>
+                    </div>
                   </div>
-                  <div className="flex flex-col items-center gap-1">
-                    <span className="text-[10px] text-muted-foreground">Fond</span>
-                    <Input type="color" className="h-8 w-8 p-1" value={selection.data.bgColor || '#ffffff'} onChange={(e) => onChange({ data: { ...selection.data, bgColor: e.target.value } })} />
-                  </div>
-                  <div className="flex-1 flex flex-col gap-1">
+                  <div className="flex flex-col gap-1">
                     <span className="text-[10px] text-muted-foreground">Opacité {Math.round((selection.data.bgOpacity ?? 1)*100)}%</span>
                     <input type="range" min={0.1} max={1} step={0.05} value={selection.data.bgOpacity ?? 1} onChange={(e) => onChange({ data: { ...selection.data, bgOpacity: parseFloat(e.target.value) } })} className="w-full" />
                   </div>

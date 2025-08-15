@@ -2,8 +2,10 @@
 import React, { memo } from 'react';
 import { Handle, Position, useStore } from 'reactflow';
 import { Boxes, Lock, Unlock } from 'lucide-react';
+import { useTheme } from '../../theme/ThemeProvider';
 import { CONTAINER_HEADER_HEIGHT } from '../constants';
 import { hexToRgba, autoTextColor } from '../diagram-helpers';
+import { effectiveBorderColor, effectiveBgColor, isAuto } from '../color-utils';
 
 // Ensure brick texture generator (used for firewall ring) is available after refactor.
 function generateBrickTexture() {
@@ -58,10 +60,15 @@ interface ComponentNodeProps {
 
 const ComponentNode = memo(({ id, data, selected, isConnectable }: ComponentNodeProps) => {
   const zoom = useStore((s) => s.transform[2]);
-  const { label = 'Component', icon, color = '#94a3b8', features = {}, bgColor = '#ffffff', bgOpacity = 1, isContainer = false, width = 520, height = 320, locked = false } = data || {};
+  const { resolvedTheme } = useTheme();
+  const isDark = resolvedTheme === 'dark';
+  const { label = 'Component', icon, color, features = {}, bgColor, bgOpacity = 1, isContainer = false, width = 520, height = 320, locked = false } = data || {};
+  const borderColor = effectiveBorderColor(color, isDark);
+  const baseBg = effectiveBgColor(bgColor, isDark);
+  const bg = hexToRgba(baseBg, bgOpacity);
   const showText = zoom >= 0.6;
-  const borderColor = color || '#94a3b8';
-  const bg = hexToRgba(bgColor, bgOpacity);
+  // dynamic label color if auto background
+  const labelColorClass = !isContainer && isAuto(bgColor) ? (isDark ? 'text-slate-100' : 'text-slate-800') : '';
   const handleSize = 10;
   const showHandles = isContainer && selected && !locked;
 
@@ -153,7 +160,7 @@ const ComponentNode = memo(({ id, data, selected, isConnectable }: ComponentNode
         <Handle type="source" position={Position.Right} className={`handle-lg !bg-gray-500/80 transition-opacity ${selected ? 'opacity-100' : 'opacity-0'}`} isConnectable={isConnectable} />
         <div className="flex items-center gap-2 min-w-0">
           {icon ? <img src={icon} alt="" className="h-7 w-7 object-contain rounded" /> : <div className="h-7 w-7 rounded bg-gray-200 dark:bg-slate-600" />}
-          {showText && <div className="font-medium text-sm truncate flex-1 text-slate-800 dark:text-slate-100" title={label || 'Unnamed'}>{label || 'Unnamed'}</div>}
+          {showText && <div className={`font-medium text-sm truncate flex-1 ${labelColorClass} dark:text-slate-100`} title={label || 'Unnamed'}>{label || 'Unnamed'}</div>}
           <span className="inline-block h-2 w-2 rounded-full flex-shrink-0" style={{ background: borderColor }} />
           <FeaturesIcons features={features} compact={!showText} />
         </div>
