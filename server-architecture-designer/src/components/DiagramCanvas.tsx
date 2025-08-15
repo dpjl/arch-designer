@@ -308,6 +308,15 @@ function DiagramCanvas() {
   const { historyRef, lastCommitRef, commitIfChanged, undo, redo } = useDiagramHistory(setNodes, setEdges, showFlash);
   useEffect(()=>{ (window as any).__showFlash = showFlash; },[showFlash]);
   const { selection, setSelection, selectNode } = useDiagramSelection({ setNodes, setEdges, showFlash, enableKeyboardDelete: true, getNodes: () => nodes, getEdges: () => edges });
+  const [isDark, setIsDark] = useState(false);
+  useEffect(()=>{
+    const mq = window.matchMedia('(prefers-color-scheme: dark)');
+    const update = () => setIsDark(document.documentElement.classList.contains('dark') || mq.matches);
+    update();
+    mq.addEventListener('change', update);
+    const obs = new MutationObserver(update); obs.observe(document.documentElement, { attributes:true, attributeFilter:['class'] });
+    return ()=>{ mq.removeEventListener('change', update); obs.disconnect(); };
+  }, []);
   // Networks present in the diagram (derived from nodes; stable IDs)
   type Network = { id: string; label: string; color: string };
   const [networks, setNetworks] = useState<Network[]>([]);
@@ -369,9 +378,7 @@ function DiagramCanvas() {
   /* Elevate edges above nodes (user request) */
   .react-flow__edges { z-index: 50 !important; }
   .react-flow__nodes { z-index: 10 !important; }
-  /* Dark mode grid softening */
-  .dark .react-flow__background.react-flow__background-lines line { stroke: rgba(255,255,255,0.06); }
-  .dark .react-flow__background.react-flow__background-lines pattern line { stroke: rgba(255,255,255,0.06); }
+  /* Grid color now controlled via ReactFlow <Background color=> prop; CSS fallback kept minimal */
   .dark .react-flow__background { background: linear-gradient(to bottom, #0f172a, #020617); }
   /* Preserve node interactivity: edge paths keep pointer-events default (stroke) */
 
@@ -994,7 +1001,7 @@ function DiagramCanvas() {
                   >
                     <MiniMap pannable zoomable className="!rounded-xl !bg-white/80 dark:!bg-slate-800/65 !backdrop-blur !border border-slate-200/60 dark:!border-slate-600/60" nodeStrokeWidth={1} nodeColor={miniMapNodeColorFn} />
                     <Controls showInteractive={false} className="!rounded-xl" />
-                    <Background variant={BackgroundVariant.Lines} gap={24} className="stroke-slate-200 dark:stroke-slate-700" />
+                    <Background variant={BackgroundVariant.Lines} gap={24} color={isDark ? '#18222b' : '#e2e8f0'} size={1} />
                   </ReactFlow>
                 </div>
               </CardContent>
