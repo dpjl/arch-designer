@@ -26,14 +26,32 @@ import ReactFlow, {
 } from "reactflow";
 import "reactflow/dist/style.css";
 import { Button } from "@/components/ui/button";
+import { Toolbar, PropertiesPanel, PalettePanel } from './diagram';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Checkbox } from "@/components/ui/checkbox";
-import { TooltipProvider } from "@/components/ui/tooltip";
 import { Trash2, Link2, Palette, Lock, Unlock, LayoutGrid, Boxes } from "lucide-react";
-import * as htmlToImage from "html-to-image";
-// Helper for background opacity
+import * as htmlToImage from 'html-to-image';
+import { TooltipProvider } from '@/components/ui/tooltip';
+import { Input } from "@/components/ui/input";
+// PaletteItem moved into PalettePanel
+// function PaletteItem({ entry, onDragStart }: any) {
+//   return (
+//     <div
+//       draggable
+//       onDragStart={(e) => onDragStart(e, entry)}
+//       className="group relative aspect-square rounded-lg border bg-white/80 hover:bg-white hover:shadow-md cursor-grab active:cursor-grabbing transition-all duration-200 flex items-center justify-center p-2"
+//     >
+//       <img src={entry.icon} alt="" className="max-h-6 max-w-6 object-contain" />
+//       
+//       {/* Tooltip au survol */}
+//       <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-2 py-1 bg-slate-900/90 text-white text-xs rounded-md opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-10">
+//         {entry.label}
+//         <div className="absolute top-full left-1/2 transform -translate-x-1/2 border-4 border-transparent border-t-slate-900/90"></div>
+//       </div>
+//     </div>
+//   );
+// }
+
+// Helper for background opacity tint
 function hexToRgba(hex: string, alpha: number) {
   if (!hex) return `rgba(255,255,255,${alpha})`;
   const h = hex.replace('#','');
@@ -41,10 +59,9 @@ function hexToRgba(hex: string, alpha: number) {
   const v = parseInt(full,16);
   const r=(v>>16)&255,g=(v>>8)&255,b=v&255; return `rgba(${r},${g},${b},${alpha})`;
 }
-// Modes (removed CONNECT)
-export const MODES = { EDIT: "edit", VIEW: "view" } as const;
 
-// Edge color modes
+// Modes
+export const MODES = { EDIT: 'edit', VIEW: 'view' } as const;
 
 // Simple Icons CDN for stable brand SVGs
 const SI = (name: string) => `https://cdn.simpleicons.org/${name}`;
@@ -544,394 +561,6 @@ const SectionTitle = ({ children }: { children: React.ReactNode }) => (
   <h4 className="text-xs font-medium text-slate-600 mb-2 uppercase tracking-wide">{children}</h4>
 );
 // Toolbar extracted
-import { Toolbar } from './diagram';
-// == End Toolbar Region ======================================================
-
-function PaletteItem({ entry, onDragStart }: any) {
-  return (
-    <div
-      draggable
-      onDragStart={(e) => onDragStart(e, entry)}
-      className="group relative aspect-square rounded-lg border bg-white/80 hover:bg-white hover:shadow-md cursor-grab active:cursor-grabbing transition-all duration-200 flex items-center justify-center p-2"
-    >
-      <img src={entry.icon} alt="" className="max-h-6 max-w-6 object-contain" />
-      
-      {/* Tooltip au survol */}
-      <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-2 py-1 bg-slate-900/90 text-white text-xs rounded-md opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-10">
-        {entry.label}
-        <div className="absolute top-full left-1/2 transform -translate-x-1/2 border-4 border-transparent border-t-slate-900/90"></div>
-      </div>
-    </div>
-  );
-}
-
-function PropertiesPanel({ selection, onChange, onDelete, onClosePanel, multiCount, onDeleteSelected, networks }: any) {
-  if ((multiCount || 0) > 1) {
-    return (
-      <Card className="rounded-2xl text-[13px]">
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <CardTitle className="text-base">Multiple selection</CardTitle>
-            {onClosePanel && (
-              <button 
-                onClick={onClosePanel}
-                className="text-xs px-2 py-1 rounded-md bg-slate-100 hover:bg-slate-200 transition-colors"
-                title="Masquer le panneau"
-              >
-                ▶
-              </button>
-            )}
-          </div>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          <div className="text-sm text-slate-600">{multiCount} éléments sélectionnés.</div>
-          <div className="flex gap-2">
-            <Button variant="destructive" onClick={onDeleteSelected} className="rounded-md"><Trash2 className="h-4 w-4 mr-2"/>Supprimer</Button>
-          </div>
-          <div className="text-[11px] text-slate-500">Maj+clic pour ajouter/retirer. Glisser un cadre pour sélectionner une zone.</div>
-        </CardContent>
-      </Card>
-    );
-  }
-  if (!selection) {
-    return (
-      <Card className="rounded-2xl">
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <CardTitle className="text-base">No selection</CardTitle>
-            {onClosePanel && (
-              <button 
-                onClick={onClosePanel}
-                className="text-xs px-2 py-1 rounded-md bg-slate-100 hover:bg-slate-200 transition-colors"
-                title="Masquer le panneau"
-              >
-                ▶
-              </button>
-            )}
-          </div>
-        </CardHeader>
-        <CardContent className="text-sm text-muted-foreground">Select a node or edge to edit its properties.</CardContent>
-      </Card>
-    );
-  }
-
-  const isNode = selection.type === "node";
-  const isContainer = isNode && !!selection.data?.isContainer;
-  const isDoor = isNode && !!selection.data?.isDoor;
-  const isNetwork = isNode && selection.nodeType === 'network';
-
-  if ((multiCount || 0) > 1) {
-    return (
-      <Card className="rounded-2xl text-[13px]">
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <CardTitle className="text-base">Multiple selection</CardTitle>
-            {onClosePanel && (
-              <button 
-                onClick={onClosePanel}
-                className="text-xs px-2 py-1 rounded-md bg-slate-100 hover:bg-slate-200 transition-colors"
-                title="Masquer le panneau"
-              >
-                ▶
-              </button>
-            )}
-          </div>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          <div className="text-sm text-slate-600">{multiCount} éléments sélectionnés.</div>
-          <div className="flex gap-2">
-            <Button variant="destructive" onClick={onDeleteSelected} className="rounded-md"><Trash2 className="h-4 w-4 mr-2"/>Supprimer</Button>
-          </div>
-          <div className="text-[11px] text-slate-500">Maj+clic pour ajouter/retirer. Glisser un cadre pour sélectionner une zone.</div>
-        </CardContent>
-      </Card>
-    );
-  }
-
-  return (
-  <Card className="rounded-2xl text-[13px]">
-      <CardHeader>
-        <div className="flex items-center justify-between">
-          <CardTitle className="text-base">{isNode ? "Node" : "Edge"} properties</CardTitle>
-          {onClosePanel && (
-            <button 
-              onClick={onClosePanel}
-              className="text-xs px-2 py-1 rounded-md bg-slate-100 hover:bg-slate-200 transition-colors"
-              title="Masquer le panneau"
-            >
-              ▶
-            </button>
-          )}
-        </div>
-      </CardHeader>
-  <CardContent className="space-y-5 text-[13px]">
-        {isNode ? (
-          <>
-    {isNetwork && (
-              <div className="space-y-2">
-                <SectionTitle>Network</SectionTitle>
-                <div className="space-y-1">
-                  <Label>Label</Label>
-      <Input value={selection.data.label || ''} onChange={(e)=> onChange({ data: { ...selection.data, label: e.target.value } })} />
-                </div>
-                <div className="space-y-1">
-                  <Label>Color</Label>
-      <Input type="color" className="h-9 w-10 p-1" value={selection.data.color || '#10b981'} onChange={(e)=> onChange({ data: { ...selection.data, color: e.target.value } })} />
-                </div>
-                <div className="space-y-1">
-                  <Label>Text color</Label>
-                  <Input type="color" className="h-9 w-10 p-1" value={selection.data.textColor || autoTextColor(selection.data.color||'#10b981')} onChange={(e)=> onChange({ data: { ...selection.data, textColor: e.target.value } })} />
-                </div>
-                <div>
-                  <Button variant="outline" size="sm" className="w-full" onClick={() => onChange({ autoFitNetwork: true })}>Ajuster à ses éléments</Button>
-                </div>
-              </div>
-            )}
-            {!isDoor && !isNetwork && (
-              <div className="space-y-1">
-                <Label>Label</Label>
-                <Input value={selection.data.label || ""} onChange={(e) => onChange({ data: { ...selection.data, label: e.target.value } })} />
-              </div>
-            )}
-            {!isDoor && !isNetwork && (
-              <div className="flex items-center gap-2 pt-1">
-                <Checkbox
-                  checked={!!selection.data.isContainer}
-                  onCheckedChange={(v) => {
-                    const makeContainer = !!v;
-                    if (makeContainer) {
-                      const w = selection.data.width || 520; const h = selection.data.height || 320;
-                      onChange({ data: { ...selection.data, isContainer: true, width: w, height: h, bgColor: selection.data.bgColor||'#ffffff', bgOpacity: selection.data.bgOpacity ?? 0.85 } });
-                    } else {
-                      onChange({ data: { ...selection.data, isContainer: false } , style: { width: undefined, height: undefined } });
-                    }
-                  }}
-                />
-                <span className="text-xs">Mode container</span>
-              </div>
-            )}
-            {!isDoor && !isNetwork && (
-              <div className="space-y-1">
-                <SectionTitle>Couleurs</SectionTitle>
-                <div className="flex items-center gap-2">
-                  <div className="flex flex-col items-center gap-1">
-                    <span className="text-[10px] text-muted-foreground">Bord</span>
-                    <Input type="color" className="h-8 w-8 p-1" value={selection.data.color || "#94a3b8"} onChange={(e) => onChange({ data: { ...selection.data, color: e.target.value } })} />
-                  </div>
-                  <div className="flex flex-col items-center gap-1">
-                    <span className="text-[10px] text-muted-foreground">Fond</span>
-                    <Input type="color" className="h-8 w-8 p-1" value={selection.data.bgColor || "#ffffff"} onChange={(e) => onChange({ data: { ...selection.data, bgColor: e.target.value } })} />
-                  </div>
-                  <div className="flex-1 flex flex-col gap-1">
-                    <span className="text-[10px] text-muted-foreground">Opacité {Math.round((selection.data.bgOpacity ?? 1)*100)}%</span>
-                    <input type="range" min={0.1} max={1} step={0.05} value={selection.data.bgOpacity ?? 1} onChange={(e) => onChange({ data: { ...selection.data, bgOpacity: parseFloat(e.target.value) } })} className="w-full" />
-                  </div>
-                </div>
-              </div>
-            )}
-            {!isDoor && !isNetwork && (
-              <div className="space-y-1">
-                <SectionTitle>Features</SectionTitle>
-                <div className="flex items-center gap-2">
-                  <button type="button" title="Auth simple" onClick={() => onChange({ data:{ ...selection.data, features: exclusiveAuthToggle(selection.data.features, 'auth1', !selection.data.features?.auth1) } })} className={`h-9 w-9 rounded-lg border flex items-center justify-center bg-white hover:bg-slate-50 ${selection.data.features?.auth1 ? 'ring-2 ring-blue-500 border-blue-400' : 'border-slate-200'}`}>🔑</button>
-                  <button type="button" title="Auth double" onClick={() => onChange({ data:{ ...selection.data, features: exclusiveAuthToggle(selection.data.features, 'auth2', !selection.data.features?.auth2) } })} className={`h-9 w-9 rounded-lg border flex items-center justify-center bg-white hover:bg-slate-50 ${selection.data.features?.auth2 ? 'ring-2 ring-blue-500 border-blue-400' : 'border-slate-200'}`}>🔑🔑</button>
-                  <button type="button" title="Sablier" onClick={() => onChange({ data:{ ...selection.data, features: { ...(selection.data.features||{}), hourglass: !selection.data.features?.hourglass } } })} className={`h-9 w-9 rounded-lg border flex items-center justify-center bg-white hover:bg-slate-50 ${selection.data.features?.hourglass ? 'ring-2 ring-blue-500 border-blue-400' : 'border-slate-200'}`}>⏳</button>
-                  <button type="button" title="Firewall" onClick={() => onChange({ data:{ ...selection.data, features: { ...(selection.data.features||{}), firewall: !selection.data.features?.firewall } } })} className={`h-9 w-9 rounded-lg border flex items-center justify-center bg-white hover:bg-slate-50 ${selection.data.features?.firewall ? 'ring-2 ring-red-500 border-red-400' : 'border-slate-200'}`}>🛡️</button>
-                </div>
-              </div>
-            )}
-
-            {/* Service instances management */}
-            {!isDoor && !isContainer && !isNetwork && (
-              <div className="space-y-2">
-                <SectionTitle>Instances</SectionTitle>
-                <div className="space-y-2">
-                  {(selection.data.instances || []).map((ins: any, idx: number) => {
-                    const auth = ins?.auth as ('auth1'|'auth2'|undefined);
-                    return (
-                      <div key={idx} className="p-2 rounded-md border bg-white space-y-1.5">
-                        <div className="flex items-center justify-between gap-2">
-                          <span className="text-[10px] uppercase tracking-wide text-slate-500">Instance ID</span>
-                          <span className="text-[10px] text-slate-400">#{idx+1}</span>
-                        </div>
-                        <Input className="h-8 text-xs w-full" placeholder={`id-${idx+1}`} value={ins?.id || ''} onChange={(e)=>{
-                          const list = [...(selection.data.instances||[])]; list[idx] = { ...list[idx], id: e.target.value }; onChange({ data: { ...selection.data, instances: list } });
-                        }} />
-                        <div className="flex items-center gap-2">
-                          <div className="flex items-center gap-1">
-                            <button type="button" title="No auth" onClick={()=>{ const list=[...(selection.data.instances||[])]; list[idx]={...list[idx], auth: undefined}; onChange({ data:{...selection.data, instances:list} }); }} className={`h-7 w-7 rounded-md border text-xs ${!auth ? 'ring-2 ring-slate-400 border-slate-300' : 'border-slate-200'}`}>—</button>
-                            <button type="button" title="Auth simple" onClick={()=>{ const list=[...(selection.data.instances||[])]; list[idx]={...list[idx], auth:'auth1'}; onChange({ data:{...selection.data, instances:list} }); }} className={`h-7 w-7 rounded-md border text-[10px] leading-[0.8] ${auth==='auth1' ? 'ring-2 ring-blue-500 border-blue-400' : 'border-slate-200'}`}><span>🔑</span></button>
-                            <button type="button" title="Auth double" onClick={()=>{ const list=[...(selection.data.instances||[])]; list[idx]={...list[idx], auth:'auth2'}; onChange({ data:{...selection.data, instances:list} }); }} className={`h-7 w-7 rounded-md border text-[10px] leading-[0.8] ${auth==='auth2' ? 'ring-2 ring-blue-500 border-blue-400' : 'border-slate-200'}`}><span className="inline-flex flex-col" style={{ lineHeight: 0.8 }}><span>🔑</span><span>🔑</span></span></button>
-                          </div>
-                          <div className="ml-auto flex items-center gap-1">
-                            <Input type="color" className="h-7 w-8 p-0.5" value={ins?.bgColor || '#ffffff'} onChange={(e)=>{ const list=[...(selection.data.instances||[])]; const bg=e.target.value; const fg = ins?.fgColor || autoTextColor(bg); list[idx]={...list[idx], bgColor: bg, fgColor: fg}; onChange({ data:{...selection.data, instances:list} }); }} />
-                            <Input type="color" className="h-7 w-8 p-0.5" value={ins?.fgColor || autoTextColor(ins?.bgColor)} onChange={(e)=>{ const list=[...(selection.data.instances||[])]; list[idx]={...list[idx], fgColor: e.target.value}; onChange({ data:{...selection.data, instances:list} }); }} />
-                            <button type="button" onClick={()=>{ const list=[...(selection.data.instances||[])]; list.splice(idx,1); onChange({ data:{...selection.data, instances:list} }); }} className="h-7 px-2 rounded-md bg-slate-100 hover:bg-slate-200 border">✕</button>
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
-                  <div className="flex items-center justify-between">
-                    <div className="text-[11px] text-slate-500">Count: {(selection.data.instances||[]).length}</div>
-                    <Button size="sm" variant="outline" onClick={()=>{ const list=[...(selection.data.instances||[])]; list.push({ id: `inst-${list.length+1}` }); onChange({ data:{...selection.data, instances:list} }); }}>Add instance</Button>
-                  </div>
-                </div>
-              </div>
-            )}
-
-      {!isDoor && !isContainer && !isNetwork && (
-              <div className="space-y-2">
-                <SectionTitle>Réseaux</SectionTitle>
-        <NetworksInlineEditor selection={selection} onChange={onChange} networks={networks} />
-              </div>
-            )}
-
-            {/* Door-only properties (compact panel) */}
-            {isDoor && (
-              <>
-                <SectionTitle>Door</SectionTitle>
-                <div className="space-y-1">
-                  <Label>Allowed</Label>
-                  <Input value={selection.data.allow || ''} placeholder="e.g., HTTPS" onChange={(e) => onChange({ data: { ...selection.data, allow: e.target.value } })} />
-                  <div className="text-[11px] text-slate-500">Text shown on the door, representing the allowed flow.</div>
-                </div>
-                <div className="pt-2 grid grid-cols-2 gap-2">
-                  <div>
-                    <Label>Width</Label>
-                    <input type="range" min={80} max={240} step={4} value={selection.data.width ?? DEFAULT_DOOR_WIDTH} onChange={(e)=> onChange({ data: { ...selection.data, width: parseInt(e.target.value,10) } })} className="w-full" />
-                    <div className="text-[11px] text-slate-500">{selection.data.width ?? DEFAULT_DOOR_WIDTH}px</div>
-                  </div>
-                  <div>
-                    <Label>Scale</Label>
-                    <input type="range" min={0.6} max={2} step={0.05} value={selection.data.scale ?? 1} onChange={(e)=> onChange({ data: { ...selection.data, scale: parseFloat(e.target.value) } })} className="w-full" />
-                    <div className="text-[11px] text-slate-500">{Math.round((selection.data.scale ?? 1)*100)}%</div>
-                    <label className="flex items-center gap-2 text-xs mt-1"><input type="checkbox" checked={!!selection.data.lockedIcon} onChange={(e)=> onChange({ data:{ ...selection.data, lockedIcon: e.target.checked } })} /> Lock icon</label>
-                  </div>
-                </div>
-                <div className="pt-2">
-                  <Label>Wall Offset</Label>
-                  <input type="range" min={-4} max={4} step={1} value={(selection.data.offset || 0)} onChange={(e)=> {
-                    const v = parseInt(e.target.value,10);
-                    const side = selection.data.side as ('top'|'bottom'|'left'|'right'|undefined);
-                    const nextOffsets:any = { ...(selection.data.offsets||{}) };
-                    if (side) nextOffsets[side] = v; else nextOffsets.top = v;
-                    onChange({ data: { ...selection.data, offset: v, offsets: nextOffsets }, resnapDoor: true });
-                  }} className="w-full" />
-                  <div className="text-[11px] text-slate-500">Anchored side: {selection.data.side || 'auto'}</div>
-                </div>
-              </>
-            )}
-            {!isDoor && isContainer && (
-              <div className="space-y-2">
-                <div className="space-y-1">
-                  <SectionTitle>Container</SectionTitle>
-                  <div className="grid grid-cols-2 gap-2">
-                    <Input type="number" value={selection.data.width} onChange={(e) => onChange({ data: { ...selection.data, width: Number(e.target.value) || 0 } })} />
-                    <Input type="number" value={selection.data.height} onChange={(e) => onChange({ data: { ...selection.data, height: Number(e.target.value) || 0 } })} />
-                  </div>
-                </div>
-                <div>
-                  <Button variant="outline" size="sm" className="w-full" onClick={() => onChange({ autoFitContainer: true })}>Auto-fit aux enfants</Button>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Checkbox checked={!!selection.data.locked} onCheckedChange={(v) => onChange({ data: { ...selection.data, locked: !!v } })} />
-                  <span className="text-xs">Verrouiller le container</span>
-                </div>
-              </div>
-            )}
-            {!isDoor && (
-            <div className="space-y-1">
-              <SectionTitle>Icône</SectionTitle>
-              <div className="grid grid-cols-5 gap-2 max-h-44 overflow-y-auto p-2 rounded border bg-slate-50/50">
-                {CATALOG.map(c => {
-                  const active = selection.data.icon === c.icon;
-                  return (
-                    <div key={c.id} className="group relative">
-                      <button 
-                        type="button" 
-                        onClick={() => onChange({ data: { ...selection.data, icon: c.icon } })} 
-                        className={`h-10 w-10 rounded-xl border bg-white/80 hover:bg-white hover:shadow-md transition-all duration-200 flex items-center justify-center p-1 ${active ? 'ring-2 ring-blue-500 border-blue-400' : 'border-slate-200'}`}
-                      >
-                        <img src={c.icon} alt="" className="h-8 w-8 object-contain" />
-                      </button>
-                      
-                      {/* Tooltip au survol */}
-                      <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-2 py-1 bg-slate-900/90 text-white text-xs rounded-md opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-10">
-                        {c.label}
-                        <div className="absolute top-full left-1/2 transform -translate-x-1/2 border-4 border-transparent border-t-slate-900/90"></div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-              <Input className="mt-2 text-xs" value={selection.data.icon || ""} onChange={(e) => onChange({ data: { ...selection.data, icon: e.target.value } })} placeholder="URL personnalisée..." />
-            </div>
-            )}
-            {!isDoor && isNode && selection.parentNode && (
-              <div>
-                <Button variant="outline" size="sm" className="w-full" onClick={() => onChange({ detachFromParent: true })}>Détacher du container (ou Alt+Drag)</Button>
-              </div>
-            )}
-            {!isDoor && isContainer && selection.parentNode && (
-              <div>
-                <Button variant="outline" size="sm" className="w-full" onClick={() => onChange({ detachFromParent: true })}>Détacher ce container du parent</Button>
-              </div>
-            )}
-          </>
-        ) : (
-          <>
-            <div className="space-y-1">
-              <SectionTitle>Label</SectionTitle>
-              <Input value={selection.label || ""} onChange={(e) => onChange({ label: e.target.value })} />
-            </div>
-            <div className="space-y-1">
-              <SectionTitle>Forme</SectionTitle>
-              <div className="flex gap-2">
-                {[
-                  {id:'smooth', svg:<svg width="48" height="18"><path d="M2 14 C18 2 30 2 46 14" stroke="#475569" strokeWidth={2} fill="none" strokeLinecap="round"/></svg>, title:'Courbe'},
-                  {id:'straight', svg:<svg width="48" height="18"><line x1="2" y1="9" x2="46" y2="9" stroke="#475569" strokeWidth={2} strokeLinecap="round"/></svg>, title:'Droite'},
-                  {id:'step', svg:<svg width="48" height="18"><path d="M2 14 H24 V4 H46" stroke="#475569" strokeWidth={2} fill="none" strokeLinecap="round"/></svg>, title:'Angles'},
-                ].map(opt => {
-                  const active = (selection.data?.shape || 'smooth') === opt.id;
-                  return <button key={opt.id} type="button" title={opt.title} onClick={() => { const typeMap:Record<string,string>={smooth:'smoothstep',straight:'default',step:'step'}; onChange({ type:typeMap[opt.id]||'smoothstep', data:{...(selection.data||{}), shape:opt.id}}); }} className={`h-10 w-14 flex items-center justify-center rounded-md border ${active?'bg-blue-50 border-blue-500':'bg-white hover:bg-slate-50'}`}>{opt.svg}</button>;
-                })}
-              </div>
-            </div>
-            <div className="space-y-1">
-              <SectionTitle>Motif</SectionTitle>
-              <div className="flex gap-2">
-                {[
-                  {id:'solid', dash:'', title:'Continu'},
-                  {id:'dashed', dash:'6 6', title:'Pointillés'},
-                  {id:'animated', dash:'6 6', title:'Animé', anim:true},
-                ].map(opt => {
-                  const active = (selection.data?.pattern || 'solid') === opt.id;
-                  return <button key={opt.id} type="button" title={opt.title} onClick={()=> onChange({ data:{...(selection.data||{}), pattern: opt.id } })} className={`h-10 w-14 flex items-center justify-center rounded-md border ${active?'bg-blue-50 border-blue-500':'bg-white hover:bg-slate-50'}`}>
-                    <svg width="48" height="18"><line x1="2" y1="9" x2="46" y2="9" stroke="#475569" strokeWidth={2} strokeDasharray={opt.dash} strokeLinecap="round">{opt.anim && <animate attributeName="stroke-dashoffset" from="0" to="-20" dur="1s" repeatCount="indefinite" />}</line></svg>
-                  </button>;
-                })}
-              </div>
-            </div>
-            <div className="space-y-1">
-              <SectionTitle>Épaisseur</SectionTitle>
-              <div className="flex gap-2 flex-wrap">
-                {[1,2,3,4,6].map(w => { const active=(selection.style?.strokeWidth||2)===w; return <button key={w} type="button" title={`Épaisseur ${w}`} onClick={()=> onChange({ style:{...(selection.style||{}), strokeWidth:w } })} className={`h-9 px-2 flex items-center justify-center rounded-md border min-w-[44px] ${active?'bg-blue-50 border-blue-500':'bg-white hover:bg-slate-50'}`}><div className="w-8"><svg width="32" height={w+4}><line x1="0" y1={w/2+2} x2="32" y2={w/2+2} stroke="#475569" strokeWidth={w} strokeLinecap="round"/></svg></div></button>; })}
-              </div>
-            </div>
-            <div className="space-y-1">
-              <SectionTitle>Couleur</SectionTitle>
-              <Input value={selection.style?.stroke || '#94a3b8'} type="color" onChange={(e) => onChange({ style: { ...(selection.style || {}), stroke: e.target.value } })} />
-            </div>
-          </>
-        )}
-        <div className="pt-2">
-          <Button variant="destructive" className="w-full" onClick={onDelete}><Trash2 className="h-4 w-4 mr-2"/>Delete</Button>
-        </div>
-      </CardContent>
-    </Card>
-  );
-}
 
 function NetworksInlineEditor({ selection, onChange, networks }: any){
   const present = Array.isArray(networks) ? networks : [];
@@ -1754,72 +1383,7 @@ function DiagramCanvas() {
           {/* Left Panel */}
           {showLeftPanel ? (
             <div className="w-72 sm:w-80 flex-shrink-0 space-y-4 overflow-y-auto pr-1 hidden md:block">
-              <Card className="rounded-2xl">
-                <CardHeader>
-                  <div className="flex items-center justify-between">
-                    <CardTitle className="text-base">Palette</CardTitle>
-                    <button 
-                      onClick={() => setShowLeftPanel(false)}
-                      className="text-xs px-2 py-1 rounded-md bg-slate-100 hover:bg-slate-200 transition-colors"
-                      title="Masquer le panneau"
-                    >
-                      ◀
-                    </button>
-                  </div>
-                </CardHeader>
-                <CardContent className="space-y-5">
-                  {/* Containers (groups) */}
-                  <div>
-                    <h4 className="text-xs font-medium text-slate-600 mb-2 uppercase tracking-wide">Containers</h4>
-                    <div className="grid grid-cols-6 gap-2">
-                      {CATALOG.filter(entry => entry.category === 'container').map((entry) => (
-                        <PaletteItem key={entry.id} entry={entry} onDragStart={onEntryDragStart as any} />
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Services */}
-                  <div>
-                    <h4 className="text-xs font-medium text-slate-600 mb-2 uppercase tracking-wide">Services</h4>
-                    <div className="grid grid-cols-6 gap-2">
-                      {CATALOG.filter(entry => entry.category === 'service').map((entry) => (
-                        <PaletteItem key={entry.id} entry={entry} onDragStart={onEntryDragStart as any} />
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Security */}
-                  <div>
-                    <h4 className="text-xs font-medium text-slate-600 mb-2 uppercase tracking-wide">Security</h4>
-                    <div className="grid grid-cols-6 gap-2">
-                      {CATALOG.filter(entry => entry.category === 'security').map((entry) => (
-                        <PaletteItem key={entry.id} entry={entry} onDragStart={onEntryDragStart as any} />
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Generic Shapes */}
-                  <div>
-                    <h4 className="text-xs font-medium text-slate-600 mb-2 uppercase tracking-wide">Generic</h4>
-                    <div className="grid grid-cols-6 gap-2">
-                      {CATALOG.filter(entry => entry.category === 'generic').map((entry) => (
-                        <PaletteItem key={entry.id} entry={entry} onDragStart={onEntryDragStart as any} />
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Networks */}
-                  <div>
-                    <h4 className="text-xs font-medium text-slate-600 mb-2 uppercase tracking-wide">Networks</h4>
-                    <div className="grid grid-cols-6 gap-2">
-                      {CATALOG.filter(entry => entry.id === 'network').map((entry) => (
-                        <PaletteItem key={entry.id} entry={entry} onDragStart={onEntryDragStart as any} />
-                      ))}
-                    </div>
-                    {/* Only drag-and-drop creation retained */}
-                  </div>
-                </CardContent>
-              </Card>
+              <PalettePanel visible={true} onClose={()=>setShowLeftPanel(false)} onEntryDragStart={onEntryDragStart as any} />
             </div>
           ) : (
             <div className="flex-shrink-0 flex items-start pt-2 hidden md:flex">
@@ -1900,14 +1464,7 @@ function DiagramCanvas() {
                 <h2 className="font-semibold text-sm">Palette</h2>
                 <button onClick={()=>setShowLeftPanel(false)} className="text-xs px-2 py-1 rounded bg-slate-200">Fermer</button>
               </div>
-              <div className="grid grid-cols-5 gap-2">
-                {CATALOG.map(entry => (
-                  <div key={entry.id} draggable onDragStart={(e)=>onEntryDragStart(e as any, entry)} className="flex flex-col items-center gap-1 p-2 rounded-lg bg-slate-50 border text-[10px]">
-                    <img src={entry.icon} alt="" className="h-6 w-6 object-contain" />
-                    <span className="truncate w-full text-center">{entry.label}</span>
-                  </div>
-                ))}
-              </div>
+              <div className="grid grid-cols-5 gap-2">{CATALOG.map(entry => (<div key={entry.id} draggable onDragStart={(e)=>onEntryDragStart(e as any, entry)} className="flex flex-col items-center gap-1 p-2 rounded-lg bg-slate-50 border text-[10px]"><img src={entry.icon} alt="" className="h-6 w-6 object-contain" /><span className="truncate w-full text-center">{entry.label}</span></div>))}</div>
             </div>
           )}
           {showRightPanel && (

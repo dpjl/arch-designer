@@ -1,0 +1,333 @@
+"use client";
+import React from 'react';
+import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Trash2 } from 'lucide-react';
+import { CATALOG } from '@/lib/catalog';
+import { autoTextColor } from '@/lib/utils';
+
+export interface PropertiesPanelProps {
+  selection: any;
+  onChange: (patch: any) => void;
+  onDelete: () => void;
+  onClosePanel?: () => void;
+  multiCount?: number;
+  onDeleteSelected: () => void;
+  networks: any[];
+}
+
+const SectionTitle: React.FC<React.PropsWithChildren> = ({ children }) => (
+  <h4 className="text-xs font-medium text-slate-600 mb-2 uppercase tracking-wide">{children}</h4>
+);
+
+function NetworksInlineEditor({ selection, onChange, networks }: any) {
+  const ids: string[] = selection?.data?.networks || [];
+  const toggle = (id: string) => {
+    const next = ids.includes(id) ? ids.filter(x=>x!==id) : ids.concat(id);
+    onChange({ data: { ...selection.data, networks: next } });
+  };
+  return (
+    <div className="flex flex-wrap gap-2">
+      {networks.map((n:any) => (
+        <button key={n.id} type="button" onClick={()=>toggle(n.id)} className="px-2 py-0.5 rounded-full border text-[11px]" style={{ background: ids.includes(n.id) ? n.color : '#ffffff', color: ids.includes(n.id) ? autoTextColor(n.color) : '#334155', borderColor: n.color }}>
+          {n.label||n.id}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+const DEFAULT_DOOR_WIDTH = 140;
+
+export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({ selection, onChange, onDelete, onClosePanel, multiCount, onDeleteSelected, networks }) => {
+  if ((multiCount || 0) > 1) {
+    return (
+      <Card className="rounded-2xl text-[13px]">
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-base">Multiple selection</CardTitle>
+            {onClosePanel && (
+              <button onClick={onClosePanel} className="text-xs px-2 py-1 rounded-md bg-slate-100 hover:bg-slate-200 transition-colors" title="Masquer le panneau">▶</button>
+            )}
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <div className="text-sm text-slate-600">{multiCount} éléments sélectionnés.</div>
+          <div className="flex gap-2">
+            <Button variant="destructive" onClick={onDeleteSelected} className="rounded-md"><Trash2 className="h-4 w-4 mr-2"/>Supprimer</Button>
+          </div>
+          <div className="text-[11px] text-slate-500">Maj+clic pour ajouter/retirer. Glisser un cadre pour sélectionner une zone.</div>
+        </CardContent>
+      </Card>
+    );
+  }
+  if (!selection) {
+    return (
+      <Card className="rounded-2xl">
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-base">No selection</CardTitle>
+            {onClosePanel && (
+              <button onClick={onClosePanel} className="text-xs px-2 py-1 rounded-md bg-slate-100 hover:bg-slate-200 transition-colors" title="Masquer le panneau">▶</button>
+            )}
+          </div>
+        </CardHeader>
+        <CardContent className="text-sm text-muted-foreground">Select a node or edge to edit its properties.</CardContent>
+      </Card>
+    );
+  }
+
+  const isNode = selection.type === 'node';
+  const isContainer = isNode && !!selection.data?.isContainer;
+  const isDoor = isNode && !!selection.data?.isDoor;
+  const isNetwork = isNode && selection.nodeType === 'network';
+
+  return (
+    <Card className="rounded-2xl text-[13px]">
+      <CardHeader>
+        <div className="flex items-center justify-between">
+          <CardTitle className="text-base">{isNode ? 'Node' : 'Edge'} properties</CardTitle>
+          {onClosePanel && (
+            <button onClick={onClosePanel} className="text-xs px-2 py-1 rounded-md bg-slate-100 hover:bg-slate-200 transition-colors" title="Masquer le panneau">▶</button>
+          )}
+        </div>
+      </CardHeader>
+      <CardContent className="space-y-5 text-[13px]">
+        {isNode ? (
+          <>
+            {isNetwork && (
+              <div className="space-y-2">
+                <SectionTitle>Network</SectionTitle>
+                <div className="space-y-1">
+                  <Label>Label</Label>
+                  <Input value={selection.data.label || ''} onChange={(e)=> onChange({ data: { ...selection.data, label: e.target.value } })} />
+                </div>
+                <div className="space-y-1">
+                  <Label>Color</Label>
+                  <Input type="color" className="h-9 w-10 p-1" value={selection.data.color || '#10b981'} onChange={(e)=> onChange({ data: { ...selection.data, color: e.target.value } })} />
+                </div>
+                <div className="space-y-1">
+                  <Label>Text color</Label>
+                  <Input type="color" className="h-9 w-10 p-1" value={selection.data.textColor || autoTextColor(selection.data.color||'#10b981')} onChange={(e)=> onChange({ data: { ...selection.data, textColor: e.target.value } })} />
+                </div>
+                <div>
+                  <Button variant="outline" size="sm" className="w-full" onClick={() => onChange({ autoFitNetwork: true })}>Ajuster à ses éléments</Button>
+                </div>
+              </div>
+            )}
+            {!isDoor && !isNetwork && (
+              <div className="space-y-1">
+                <Label>Label</Label>
+                <Input value={selection.data.label || ''} onChange={(e) => onChange({ data: { ...selection.data, label: e.target.value } })} />
+              </div>
+            )}
+            {!isDoor && !isNetwork && (
+              <div className="flex items-center gap-2 pt-1">
+                <Checkbox
+                  checked={!!selection.data.isContainer}
+                  onCheckedChange={(v) => {
+                    const makeContainer = !!v;
+                    if (makeContainer) {
+                      const w = selection.data.width || 520; const h = selection.data.height || 320;
+                      onChange({ data: { ...selection.data, isContainer: true, width: w, height: h, bgColor: selection.data.bgColor||'#ffffff', bgOpacity: selection.data.bgOpacity ?? 0.85 } });
+                    } else {
+                      onChange({ data: { ...selection.data, isContainer: false }, style: { width: undefined, height: undefined } });
+                    }
+                  }}
+                />
+                <span className="text-xs">Mode container</span>
+              </div>
+            )}
+            {!isDoor && !isNetwork && (
+              <div className="space-y-1">
+                <SectionTitle>Couleurs</SectionTitle>
+                <div className="flex items-center gap-2">
+                  <div className="flex flex-col items-center gap-1">
+                    <span className="text-[10px] text-muted-foreground">Bord</span>
+                    <Input type="color" className="h-8 w-8 p-1" value={selection.data.color || '#94a3b8'} onChange={(e) => onChange({ data: { ...selection.data, color: e.target.value } })} />
+                  </div>
+                  <div className="flex flex-col items-center gap-1">
+                    <span className="text-[10px] text-muted-foreground">Fond</span>
+                    <Input type="color" className="h-8 w-8 p-1" value={selection.data.bgColor || '#ffffff'} onChange={(e) => onChange({ data: { ...selection.data, bgColor: e.target.value } })} />
+                  </div>
+                  <div className="flex-1 flex flex-col gap-1">
+                    <span className="text-[10px] text-muted-foreground">Opacité {Math.round((selection.data.bgOpacity ?? 1)*100)}%</span>
+                    <input type="range" min={0.1} max={1} step={0.05} value={selection.data.bgOpacity ?? 1} onChange={(e) => onChange({ data: { ...selection.data, bgOpacity: parseFloat(e.target.value) } })} className="w-full" />
+                  </div>
+                </div>
+              </div>
+            )}
+            {!isDoor && !isNetwork && (
+              <div className="space-y-1">
+                <SectionTitle>Features</SectionTitle>
+                <div className="flex items-center gap-2">
+                  <button type="button" title="Auth simple" onClick={() => onChange({ data:{ ...selection.data, features: exclusiveAuthToggle(selection.data.features, 'auth1', !selection.data.features?.auth1) } })} className={`h-9 w-9 rounded-lg border flex items-center justify-center bg-white hover:bg-slate-50 ${selection.data.features?.auth1 ? 'ring-2 ring-blue-500 border-blue-400' : 'border-slate-200'}`}>🔑</button>
+                  <button type="button" title="Auth double" onClick={() => onChange({ data:{ ...selection.data, features: exclusiveAuthToggle(selection.data.features, 'auth2', !selection.data.features?.auth2) } })} className={`h-9 w-9 rounded-lg border flex items-center justify-center bg-white hover:bg-slate-50 ${selection.data.features?.auth2 ? 'ring-2 ring-blue-500 border-blue-400' : 'border-slate-200'}`}>🔑🔑</button>
+                  <button type="button" title="Sablier" onClick={() => onChange({ data:{ ...selection.data, features: { ...(selection.data.features||{}), hourglass: !selection.data.features?.hourglass } } })} className={`h-9 w-9 rounded-lg border flex items-center justify-center bg-white hover:bg-slate-50 ${selection.data.features?.hourglass ? 'ring-2 ring-blue-500 border-blue-400' : 'border-slate-200'}`}>⏳</button>
+                  <button type="button" title="Firewall" onClick={() => onChange({ data:{ ...selection.data, features: { ...(selection.data.features||{}), firewall: !selection.data.features?.firewall } } })} className={`h-9 w-9 rounded-lg border flex items-center justify-center bg-white hover:bg-slate-50 ${selection.data.features?.firewall ? 'ring-2 ring-red-500 border-red-400' : 'border-slate-200'}`}>🛡️</button>
+                </div>
+              </div>
+            )}
+            {!isDoor && !isContainer && !isNetwork && (
+              <div className="space-y-2">
+                <SectionTitle>Instances</SectionTitle>
+                <div className="space-y-2">
+                  {(selection.data.instances || []).map((ins: any, idx: number) => {
+                    const auth = ins?.auth as ('auth1'|'auth2'|undefined);
+                    return (
+                      <div key={idx} className="p-2 rounded-md border bg-white space-y-1.5">
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-[10px] uppercase tracking-wide text-slate-500">Instance ID</span>
+                          <span className="text-[10px] text-slate-400">#{idx+1}</span>
+                        </div>
+                        <Input className="h-8 text-xs w-full" placeholder={`id-${idx+1}`} value={ins?.id || ''} onChange={(e)=>{
+                          const list = [...(selection.data.instances||[])]; list[idx] = { ...list[idx], id: e.target.value }; onChange({ data: { ...selection.data, instances: list } });
+                        }} />
+                        <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-1">
+                            <button type="button" title="No auth" onClick={()=>{ const list=[...(selection.data.instances||[])]; list[idx]={...list[idx], auth: undefined}; onChange({ data:{...selection.data, instances:list} }); }} className={`h-7 w-7 rounded-md border text-xs ${!auth ? 'ring-2 ring-slate-400 border-slate-300' : 'border-slate-200'}`}>—</button>
+                            <button type="button" title="Auth simple" onClick={()=>{ const list=[...(selection.data.instances||[])]; list[idx]={...list[idx], auth:'auth1'}; onChange({ data:{...selection.data, instances:list} }); }} className={`h-7 w-7 rounded-md border text-[10px] leading-[0.8] ${auth==='auth1' ? 'ring-2 ring-blue-500 border-blue-400' : 'border-slate-200'}`}><span>🔑</span></button>
+                            <button type="button" title="Auth double" onClick={()=>{ const list=[...(selection.data.instances||[])]; list[idx]={...list[idx], auth:'auth2'}; onChange({ data:{...selection.data, instances:list} }); }} className={`h-7 w-7 rounded-md border text-[10px] leading-[0.8] ${auth==='auth2' ? 'ring-2 ring-blue-500 border-blue-400' : 'border-slate-200'}`}><span className="inline-flex flex-col" style={{ lineHeight: 0.8 }}><span>🔑</span><span>🔑</span></span></button>
+                          </div>
+                          <div className="ml-auto flex items-center gap-1">
+                            <Input type="color" className="h-7 w-8 p-0.5" value={ins?.bgColor || '#ffffff'} onChange={(e)=>{ const list=[...(selection.data.instances||[])]; const bg=e.target.value; const fg = ins?.fgColor || autoTextColor(bg); list[idx]={...list[idx], bgColor: bg, fgColor: fg}; onChange({ data:{...selection.data, instances:list} }); }} />
+                            <Input type="color" className="h-7 w-8 p-0.5" value={ins?.fgColor || autoTextColor(ins?.bgColor)} onChange={(e)=>{ const list=[...(selection.data.instances||[])]; list[idx]={...list[idx], fgColor: e.target.value}; onChange({ data:{...selection.data, instances:list} }); }} />
+                            <button type="button" onClick={()=>{ const list=[...(selection.data.instances||[])]; list.splice(idx,1); onChange({ data:{...selection.data, instances:list} }); }} className="h-7 px-2 rounded-md bg-slate-100 hover:bg-slate-200 border">✕</button>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                  <div className="flex items-center justify-between">
+                    <div className="text-[11px] text-slate-500">Count: {(selection.data.instances||[]).length}</div>
+                    <Button size="sm" variant="outline" onClick={()=>{ const list=[...(selection.data.instances||[])]; list.push({ id: `inst-${list.length+1}` }); onChange({ data:{...selection.data, instances:list} }); }}>Add instance</Button>
+                  </div>
+                </div>
+              </div>
+            )}
+            {!isDoor && !isContainer && !isNetwork && (
+              <div className="space-y-2">
+                <SectionTitle>Réseaux</SectionTitle>
+                <NetworksInlineEditor selection={selection} onChange={onChange} networks={networks} />
+              </div>
+            )}
+            {isDoor && (
+              <>
+                <SectionTitle>Door</SectionTitle>
+                <div className="space-y-1">
+                  <Label>Allowed</Label>
+                  <Input value={selection.data.allow || ''} placeholder="e.g., HTTPS" onChange={(e) => onChange({ data: { ...selection.data, allow: e.target.value } })} />
+                  <div className="text-[11px] text-slate-500">Text shown on the door, representing the allowed flow.</div>
+                </div>
+                <div className="pt-2 grid grid-cols-2 gap-2">
+                  <div>
+                    <Label>Width</Label>
+                    <input type="range" min={80} max={240} step={4} value={selection.data.width ?? DEFAULT_DOOR_WIDTH} onChange={(e)=> onChange({ data: { ...selection.data, width: parseInt(e.target.value,10) } })} className="w-full" />
+                    <div className="text-[11px] text-slate-500">{selection.data.width ?? DEFAULT_DOOR_WIDTH}px</div>
+                  </div>
+                  <div>
+                    <Label>Scale</Label>
+                    <input type="range" min={0.6} max={2} step={0.05} value={selection.data.scale ?? 1} onChange={(e)=> onChange({ data: { ...selection.data, scale: parseFloat(e.target.value) } })} className="w-full" />
+                    <div className="text-[11px] text-slate-500">{Math.round((selection.data.scale ?? 1)*100)}%</div>
+                    <label className="flex items-center gap-2 text-xs mt-1"><input type="checkbox" checked={!!selection.data.lockedIcon} onChange={(e)=> onChange({ data:{ ...selection.data, lockedIcon: e.target.checked } })} /> Lock icon</label>
+                  </div>
+                </div>
+                <div className="pt-2">
+                  <Label>Wall Offset</Label>
+                  <input type="range" min={-4} max={4} step={1} value={(selection.data.offset || 0)} onChange={(e)=> {
+                    const v = parseInt(e.target.value,10);
+                    const side = selection.data.side as ('top'|'bottom'|'left'|'right'|undefined);
+                    const nextOffsets:any = { ...(selection.data.offsets||{}) };
+                    if (side) nextOffsets[side] = v; else nextOffsets.top = v;
+                    onChange({ data: { ...selection.data, offset: v, offsets: nextOffsets }, resnapDoor: true });
+                  }} className="w-full" />
+                  <div className="text-[11px] text-slate-500">Anchored side: {selection.data.side || 'auto'}</div>
+                </div>
+              </>
+            )}
+            {!isDoor && isContainer && (
+              <div className="space-y-2">
+                <div className="space-y-1">
+                  <SectionTitle>Container</SectionTitle>
+                  <div className="grid grid-cols-2 gap-2">
+                    <Input type="number" value={selection.data.width} onChange={(e) => onChange({ data: { ...selection.data, width: Number(e.target.value) || 0 } })} />
+                    <Input type="number" value={selection.data.height} onChange={(e) => onChange({ data: { ...selection.data, height: Number(e.target.value) || 0 } })} />
+                  </div>
+                </div>
+                <div>
+                  <Button variant="outline" size="sm" className="w-full" onClick={() => onChange({ autoFitContainer: true })}>Auto-fit aux enfants</Button>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Checkbox checked={!!selection.data.locked} onCheckedChange={(v) => onChange({ data: { ...selection.data, locked: !!v } })} />
+                  <span className="text-xs">Verrouiller le container</span>
+                </div>
+              </div>
+            )}
+            {!isDoor && isNode && (
+              <div className="space-y-1">
+                <SectionTitle>Icône</SectionTitle>
+                <div className="grid grid-cols-5 gap-2 max-h-44 overflow-y-auto p-2 rounded border bg-slate-50/50">
+                  {CATALOG.map(c => {
+                    const active = selection.data.icon === c.icon;
+                    return (
+                      <div key={c.id} className="group relative">
+                        <button type="button" onClick={() => onChange({ data: { ...selection.data, icon: c.icon } })} className={`h-10 w-10 rounded-xl border bg-white/80 hover:bg-white hover:shadow-md transition-all duration-200 flex items-center justify-center p-1 ${active ? 'ring-2 ring-blue-500 border-blue-400' : 'border-slate-200'}`}>
+                          <img src={c.icon} alt="" className="h-8 w-8 object-contain" />
+                        </button>
+                        <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-2 py-1 bg-slate-900/90 text-white text-xs rounded-md opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-10">
+                          {c.label}
+                          <div className="absolute top-full left-1/2 transform -translate-x-1/2 border-4 border-transparent border-t-slate-900/90" />
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+                <Input className="mt-2 text-xs" value={selection.data.icon || ''} onChange={(e) => onChange({ data: { ...selection.data, icon: e.target.value } })} placeholder="URL personnalisée..." />
+              </div>
+            )}
+            {!isDoor && isNode && selection.parentNode && (
+              <div>
+                <Button variant="outline" size="sm" className="w-full" onClick={() => onChange({ detachFromParent: true })}>Détacher du container (ou Alt+Drag)</Button>
+              </div>
+            )}
+            {!isDoor && isContainer && selection.parentNode && (
+              <div>
+                <Button variant="outline" size="sm" className="w-full" onClick={() => onChange({ detachFromParent: true })}>Détacher ce container du parent</Button>
+              </div>
+            )}
+          </>
+        ) : (
+          <div className="space-y-2">
+            <SectionTitle>Edge</SectionTitle>
+            <Button variant="destructive" className="w-full" onClick={onDelete}><Trash2 className="h-4 w-4 mr-2"/>Delete</Button>
+          </div>
+        )}
+        <div className="pt-2">
+          <Button variant="destructive" size="sm" className="w-full" onClick={onDelete}><Trash2 className="h-4 w-4 mr-2"/>Delete {isNode ? 'node' : 'edge'}</Button>
+        </div>
+      </CardContent>
+    </Card>
+  );
+};
+
+function exclusiveAuthToggle(
+  features: { auth1?: boolean; auth2?: boolean; hourglass?: boolean; firewall?: boolean } = {},
+  which: 'auth1' | 'auth2',
+  value: boolean
+) {
+  const base = { ...(features||{}) };
+  if (which === 'auth1') {
+    if (value) return { ...base, auth1: true, auth2: false };
+    return { ...base, auth1: false };
+  }
+  if (which === 'auth2') {
+    if (value) return { ...base, auth2: true, auth1: false };
+    return { ...base, auth2: false };
+  }
+  return base;
+}
+
+export default PropertiesPanel;
