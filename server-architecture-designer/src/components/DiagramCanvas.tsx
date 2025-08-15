@@ -26,7 +26,7 @@ import ReactFlow, {
 } from "reactflow";
 import "reactflow/dist/style.css";
 import { Button } from "@/components/ui/button";
-import { Toolbar, PropertiesPanel, PalettePanel } from './diagram';
+import { Toolbar, PropertiesPanel, PalettePanel, MODES, GRID_SIZE, CONTAINER_HEADER_HEIGHT, NETWORK_HEADER_HEIGHT, DEFAULT_DOOR_WIDTH, DEFAULT_DOOR_HEIGHT, HISTORY_STORAGE_KEY, SNAP_STORAGE_KEY, hexToRgba, autoTextColor, isAncestor } from './diagram';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Trash2, Link2, Palette, Lock, Unlock, LayoutGrid, Boxes } from "lucide-react";
 import * as htmlToImage from 'html-to-image';
@@ -51,17 +51,6 @@ import { Input } from "@/components/ui/input";
 //   );
 // }
 
-// Helper for background opacity tint
-function hexToRgba(hex: string, alpha: number) {
-  if (!hex) return `rgba(255,255,255,${alpha})`;
-  const h = hex.replace('#','');
-  const full = h.length === 3 ? h.split('').map(c=>c+c).join('') : h;
-  const v = parseInt(full,16);
-  const r=(v>>16)&255,g=(v>>8)&255,b=v&255; return `rgba(${r},${g},${b},${alpha})`;
-}
-
-// Modes
-export const MODES = { EDIT: 'edit', VIEW: 'view' } as const;
 
 // Simple Icons CDN for stable brand SVGs
 const SI = (name: string) => `https://cdn.simpleicons.org/${name}`;
@@ -159,21 +148,6 @@ const FeaturesIcons = memo(({ features, compact }: any) => {
 });
 
 
-// Compute readable text color (black/white) against a background hex color
-function autoTextColor(hex?: string): string {
-  if (!hex || typeof hex !== 'string') return '#111827';
-  const m = hex.trim().match(/^#?([0-9a-fA-F]{6})$/);
-  if (!m) return '#111827';
-  const int = parseInt(m[1], 16);
-  const r = (int >> 16) & 255, g = (int >> 8) & 255, b = int & 255;
-  // relative luminance (sRGB)
-  const srgb = [r, g, b].map(v => {
-    const x = v / 255;
-    return x <= 0.03928 ? x / 12.92 : Math.pow((x + 0.055) / 1.055, 2.4);
-  });
-  const L = 0.2126 * srgb[0] + 0.7152 * srgb[1] + 0.0722 * srgb[2];
-  return L > 0.6 ? '#111827' : '#ffffff';
-}
 
 // Runtime-generated PNG brick texture (small, tiled)
 let __brickTexCache: { urlH: string; urlV: string; size: number; offX: number; offY: number; shiftTopY: number; shiftSideX: number } | null = null;
@@ -239,7 +213,7 @@ function getBrickTexture(): { urlH: string; urlV: string; size: number; offX: nu
 
 // =============================
 // Unified ComponentNode (service or container via data.isContainer)
-const CONTAINER_HEADER_HEIGHT = 44;
+// Header heights now in constants
 const ComponentNode = memo(({ id, data, selected, isConnectable, xPos, yPos }: any) => {
   const zoom = useStore((s) => s.transform[2]);
   const {
@@ -398,8 +372,6 @@ const ComponentNode = memo(({ id, data, selected, isConnectable, xPos, yPos }: a
 });
 
 // Door helpers
-const DEFAULT_DOOR_WIDTH = 120;
-const DEFAULT_DOOR_HEIGHT = 32; // h-8
 const CONTAINER_RING_THICKNESS = 14; // keep in sync with container var
 const CONTAINER_RING_GAP = 8; // keep in sync with container var
 // Fine tune can be customized per side via door data; default 0 if not specified
@@ -485,7 +457,6 @@ const DoorNode = memo(({ data, selected }: any) => {
   );
 });
 
-const NETWORK_HEADER_HEIGHT = 36;
 const NetworkNode = memo(({ id, data, selected }: any) => {
   const { label = 'Network', color = '#10b981', textColor, width = 420, height = 240 } = data || {};
   const text = textColor || autoTextColor(color);
