@@ -5,7 +5,7 @@ interface UseDiagramSelectionArgs {
   setEdges: any;
   showFlash: (m:string)=>void;
   enableKeyboardDelete?: boolean;
-  getNodes?: () => any[]; // for multi-selection deletion
+  getNodes?: () => any[]; // for multi-selection deletion & cascade
   getEdges?: () => any[];
 }
 
@@ -30,24 +30,45 @@ export function useDiagramSelection({ setNodes, setEdges, showFlash, enableKeybo
       const multiSelected = nodes.some(n=>n.selected) || edges.some(ed=>ed.selected);
       if (!selection && !multiSelected) return;
       e.preventDefault();
-      if (multiSelected) {
-        const selectedNodeIds = nodes.filter(n=>n.selected).map(n=>n.id);
-        if (selectedNodeIds.length) {
-          setNodes((nds:any[])=>nds.filter(n=>!selectedNodeIds.includes(n.id)));
-          setEdges((eds:any[])=>eds.filter(e=>!selectedNodeIds.includes(e.source)&&!selectedNodeIds.includes(e.target)));
+      const cascadeDelete = (rootIds: string[]) => {
+        const allNodes = nodes;
+        const rootSet = new Set(rootIds);
+        const toDelete = new Set(rootIds);
+        let changed = true; let guard=0;
+        while (changed && guard++ < 1000) {
+          changed = false;
+          allNodes.forEach(n => { if (n.parentNode && toDelete.has(n.parentNode) && !toDelete.has(n.id)) { toDelete.add(n.id); changed = true; } });
         }
-        const selectedEdgeIds = edges.filter(ed=>ed.selected).map(ed=>ed.id);
-        if (selectedEdgeIds.length) setEdges((eds:any[])=>eds.filter(e=>!selectedEdgeIds.includes(e.id)));
+        // networks membership cleanup
+        const netIdsToRemove = new Set<string>();
+        allNodes.forEach(n => { if (toDelete.has(n.id) && n.type==='network') netIdsToRemove.add(n.data?.netId || n.id); });
+        setNodes((nds:any[])=> nds.filter(n=>!toDelete.has(n.id)).map(n=>{
+          if (!netIdsToRemove.size) return n;
+          if (n.type!=='component' || n.data?.isContainer) return n;
+            const cur:string[] = Array.isArray(n.data?.networks)? n.data.networks : [];
+            const next = cur.filter(id=>!netIdsToRemove.has(id));
+            if (next.length===cur.length) return n;
+            const nextData:any = { ...n.data, networks: next };
+            if (n.data?.primaryNetwork && netIdsToRemove.has(n.data.primaryNetwork)) delete nextData.primaryNetwork;
+            return { ...n, data: nextData };
+        }));
+        setEdges((eds:any[])=> eds.filter(e=>!toDelete.has(e.source) && !toDelete.has(e.target)));
+      };
+
+      if (multiSelected) {
+        const nodeIds = nodes.filter(n=>n.selected).map(n=>n.id);
+        if (nodeIds.length) cascadeDelete(nodeIds);
+        const edgeIds = edges.filter(ed=>ed.selected).map(ed=>ed.id);
+        if (edgeIds.length) setEdges((eds:any[])=>eds.filter(e=>!edgeIds.includes(e.id)));
         showFlash('Deleted selection');
         setSelection(null);
         return;
       }
       if (selection?.type === 'node') {
-        setNodes((nds: any[]) => nds.filter(n => n.id !== selection.id));
-        setEdges((eds: any[]) => eds.filter(e => e.source !== selection.id && e.target !== selection.id));
+        cascadeDelete([selection.id]);
         showFlash('Node deleted');
       } else if (selection?.type === 'edge') {
-        setEdges((eds: any[]) => eds.filter(e => e.id !== selection.id));
+        setEdges((eds:any[])=>eds.filter(e=>e.id!==selection.id));
         showFlash('Edge deleted');
       }
       setSelection(null);

@@ -306,7 +306,7 @@ function DiagramCanvas() {
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges as any);
   const { historyRef, lastCommitRef, commitIfChanged, undo, redo } = useDiagramHistory(setNodes, setEdges, showFlash);
   useEffect(()=>{ (window as any).__showFlash = showFlash; },[showFlash]);
-  const { selection, setSelection, selectNode } = useDiagramSelection({ setNodes, setEdges, showFlash });
+  const { selection, setSelection, selectNode } = useDiagramSelection({ setNodes, setEdges, showFlash, enableKeyboardDelete: true, getNodes: () => nodes, getEdges: () => edges });
   // Networks present in the diagram (derived from nodes; stable IDs)
   type Network = { id: string; label: string; color: string };
   const [networks, setNetworks] = useState<Network[]>([]);
