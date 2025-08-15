@@ -1,8 +1,19 @@
 import { CONTAINER_HEADER_HEIGHT, NETWORK_HEADER_HEIGHT } from './constants';
 
-export function headerOffsetFor(node: any): number {
+export function headerOffsetFor(node: any): number { // vertical offset only (legacy)
   if (!node) return 0;
+  const pos = node?.data?.headerPos || 'top';
+  if (pos === 'left') return 0;
   if (node.type === 'network') return NETWORK_HEADER_HEIGHT;
+  if (node.data?.isContainer) return CONTAINER_HEADER_HEIGHT;
+  return 0;
+}
+
+export function headerOffsetX(node: any): number {
+  if (!node) return 0;
+  const pos = node?.data?.headerPos || 'top';
+  if (pos !== 'left') return 0;
+  if (node.type === 'network') return NETWORK_HEADER_HEIGHT; // reuse same thickness
   if (node.data?.isContainer) return CONTAINER_HEADER_HEIGHT;
   return 0;
 }
@@ -11,7 +22,7 @@ export function absolutePosition(node: any, nodes: any[]): { x: number; y: numbe
   if (!node) return { x: 0, y: 0 };
   let x = node.position.x; let y = node.position.y; let cur = node.parentNode ? nodes.find(n=>n.id===node.parentNode) : null; let guard=0;
   while (cur && guard++ < 100) {
-    x += cur.position.x;
+    x += cur.position.x + headerOffsetX(cur);
     y += cur.position.y + headerOffsetFor(cur);
     cur = cur.parentNode ? nodes.find(n=>n.id===cur.parentNode) : null;
   }

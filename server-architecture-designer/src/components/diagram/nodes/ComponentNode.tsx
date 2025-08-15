@@ -94,6 +94,7 @@ const ComponentNode = memo(({ id, data, selected, isConnectable }: ComponentNode
     window.addEventListener('mousemove', move); window.addEventListener('mouseup', up);
   };
 
+  const headerPos = (data?.headerPos || 'top') as 'top'|'left';
   if (isContainer) {
     const tex = getBrickTexture();
     return (
@@ -104,10 +105,11 @@ const ComponentNode = memo(({ id, data, selected, isConnectable }: ComponentNode
             <div className="fw-bottom" />
             <div className="fw-left" />
             <div className="fw-right" />
-            <div className="fw-badge" title="Firewall activé" aria-label="firewall">🛡️</div>
+            <div className="fw-badge dark:!bg-amber-400/90 dark:!text-slate-900 dark:!border-amber-500" title="Firewall activé" aria-label="firewall">🛡️</div>
           </div>
         )}
-        <div className={`rounded-2xl overflow-hidden relative ${selected ? 'container-sel' : ''}`} style={{ width: '100%', height: '100%', border: `1px solid ${borderColor}`, background: bg, paddingTop: CONTAINER_HEADER_HEIGHT }}>
+        <div className={`rounded-2xl overflow-hidden relative ${selected ? 'container-sel' : ''}`} style={{ width: '100%', height: '100%', border: `1px solid ${borderColor}`, background: bg, paddingTop: headerPos==='top'?CONTAINER_HEADER_HEIGHT:0, paddingLeft: headerPos==='left'?CONTAINER_HEADER_HEIGHT:0 }}>
+          {headerPos==='top' && (
           <div className="absolute top-0 left-0 right-0 flex items-center gap-3 px-3 py-2 bg-white/90 dark:bg-slate-900/70 backdrop-blur border-b" style={{ borderColor: borderColor, height: CONTAINER_HEADER_HEIGHT }}>
             {icon ? (
               <div className="h-8 w-8 rounded-xl bg-white/70 dark:bg-slate-800/70 border flex items-center justify-center overflow-hidden shadow-sm">
@@ -121,7 +123,22 @@ const ComponentNode = memo(({ id, data, selected, isConnectable }: ComponentNode
               <FeaturesIcons features={features} compact />
               {locked ? <Lock className="h-3.5 w-3.5"/> : <Unlock className="h-3.5 w-3.5"/>}
             </div>
-          </div>
+          </div>)}
+          {headerPos==='left' && (
+          <div className="absolute top-0 bottom-0 left-0 flex flex-col items-center justify-start gap-3 px-2 py-3 bg-white/90 dark:bg-slate-900/70 backdrop-blur border-r" style={{ borderColor: borderColor, width: CONTAINER_HEADER_HEIGHT }}>
+            {icon ? (
+              <div className="h-8 w-8 rounded-xl bg-white/70 dark:bg-slate-800/70 border flex items-center justify-center overflow-hidden shadow-sm">
+                <img src={icon} alt="" className="max-h-7 max-w-7 object-contain" />
+              </div>
+            ) : (
+              <Boxes className="h-5 w-5" />
+            )}
+            <div className="font-semibold text-gray-800 dark:text-slate-100 truncate [writing-mode:vertical-rl] rotate-180" title={label}>{label}</div>
+            <div className="mt-auto flex flex-col items-center gap-2 text-[10px] text-slate-600">
+              <FeaturesIcons features={features} compact />
+              {locked ? <Lock className="h-3.5 w-3.5"/> : <Unlock className="h-3.5 w-3.5"/>}
+            </div>
+          </div>)}
           {showHandles && (
             <>
               <div data-resize onMouseDownCapture={(e)=>startResize(e,'e')} className="absolute top-1/2 right-0 -translate-y-1/2 translate-x-1/2 cursor-ew-resize bg-blue-500/80 hover:bg-blue-500 rounded-full shadow z-10" style={{ width: handleSize, height: handleSize }} />
@@ -137,13 +154,13 @@ const ComponentNode = memo(({ id, data, selected, isConnectable }: ComponentNode
   const tex = getBrickTexture();
   return (
     <div className="relative inline-block" style={{ ['--fwtexH' as any]: features?.firewall ? `url('${tex.urlH}')` : undefined, ['--fwtexV' as any]: features?.firewall ? `url('${tex.urlV}')` : undefined, ['--fwtexSize' as any]: features?.firewall ? `${tex.size}px ${tex.size}px` : undefined, ['--fwtexOffX' as any]: `${tex.offX}px`, ['--fwtexOffY' as any]: `${tex.offY}px`, ['--fwShiftTopY' as any]: `${tex.shiftTopY}px`, ['--fwShiftSideX' as any]: `${tex.shiftSideX}px`, ['--ringGapInner' as any]: '5px', ['--ringThickness' as any]: '12px' }}>
-      {features?.firewall && (
-        <div className="firewall-ring rounded-2xl">
+        {features?.firewall && (
+          <div className="firewall-ring rounded-2xl">
           <div className="fw-top" />
           <div className="fw-bottom" />
           <div className="fw-left" />
           <div className="fw-right" />
-          <div className="fw-badge" title="Firewall activé" aria-label="firewall">🛡️</div>
+            <div className="fw-badge dark:!bg-amber-400/90 dark:!text-slate-900 dark:!border-amber-500" title="Firewall activé" aria-label="firewall">🛡️</div>
         </div>
       )}
   <div className="group rounded-2xl shadow-lg px-2 py-1 w-[240px] hover:shadow-xl transition overflow-visible border relative dark:shadow-slate-950/40" style={{ borderColor, background: bg }}>

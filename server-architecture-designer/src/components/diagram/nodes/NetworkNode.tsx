@@ -6,7 +6,7 @@ import { hexToRgba } from '../diagram-helpers';
 interface NetworkNodeProps { id: string; data: any; selected: boolean; }
 
 const NetworkNode = memo(({ id, data, selected }: NetworkNodeProps) => {
-  const { label = 'Network', color = '#10b981', textColor, width = 420, height = 240 } = data || {};
+  const { label = 'Network', color = '#10b981', textColor, width = 420, height = 240, headerPos = 'top' } = data || {};
   const text = textColor || '#0f172a';
   const bgTint = hexToRgba(color || '#10b981', 0.08);
   const handleSize = 10;
@@ -34,8 +34,9 @@ const NetworkNode = memo(({ id, data, selected }: NetworkNodeProps) => {
   return (
     <div className="relative" style={{ width, height }}>
       {selected && <div className="absolute inset-0 -m-1 rounded-2xl ring-2 ring-blue-500 pointer-events-none" />}
-      <div className="rounded-2xl overflow-hidden relative border shadow-sm" style={{ borderColor: color, width: '100%', height: '100%' }}>
-        <div className="absolute top-2 left-1/2 -translate-x-1/2 z-[2]">
+      <div className="rounded-2xl overflow-hidden relative border shadow-sm" style={{ borderColor: color, width: '100%', height: '100%', paddingTop: headerPos==='top'?0:0, paddingLeft: headerPos==='left'?0:0 }}>
+        {headerPos==='top' && (
+        <div className="absolute top-0 left-1/2 -translate-x-1/2 z-[2] -translate-y-1/2">
           <div className="relative px-3 py-1.5 rounded-full border shadow flex items-center gap-2" style={{ background: color, color: text, borderColor: color }}>
             <div className="pointer-events-none absolute inset-0 rounded-full" style={{ background: 'linear-gradient(to bottom, rgba(255,255,255,0.24), rgba(255,255,255,0))' }} />
             <div className="pointer-events-none absolute inset-0 rounded-full border-2 border-dashed opacity-40" style={{ borderColor: text }} />
@@ -51,8 +52,26 @@ const NetworkNode = memo(({ id, data, selected }: NetworkNodeProps) => {
             </div>
             <span className="relative z-[1] text-[12px] font-semibold truncate max-w-[200px]" title={label}>{label}</span>
           </div>
-        </div>
-        <div className="absolute inset-0 pt-10" style={{ background: bgTint }} />
+        </div>)}
+        {headerPos==='left' && (
+        <div className="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-1/2 z-[2] rotate-90 origin-left">
+          <div className="relative px-3 py-1.5 rounded-full border shadow flex items-center gap-2" style={{ background: color, color: text, borderColor: color }}>
+            <div className="pointer-events-none absolute inset-0 rounded-full" style={{ background: 'linear-gradient(to bottom, rgba(255,255,255,0.24), rgba(255,255,255,0))' }} />
+            <div className="pointer-events-none absolute inset-0 rounded-full border-2 border-dashed opacity-40" style={{ borderColor: text }} />
+            <div className="relative z-[1] h-6 w-6 rounded-full flex items-center justify-center" style={{ background: 'rgba(0,0,0,0.08)' }}>
+              <svg width="16" height="12" viewBox="0 0 18 14" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <circle cx="3" cy="11" r="2" stroke={text} strokeWidth="1.5" fill="transparent" />
+                <circle cx="9" cy="3" r="2" stroke={text} strokeWidth="1.5" fill="transparent" />
+                <circle cx="15" cy="11" r="2" stroke={text} strokeWidth="1.5" fill="transparent" />
+                <path d="M4.5 10L7.5 4.5" stroke={text} strokeWidth="1.5" strokeLinecap="round" />
+                <path d="M10.5 4.5L13.5 10" stroke={text} strokeWidth="1.5" strokeLinecap="round" />
+                <path d="M5 11H13" stroke={text} strokeWidth="1.5" strokeLinecap="round" />
+              </svg>
+            </div>
+            <span className="relative z-[1] text-[12px] font-semibold truncate max-w-[200px]" title={label}>{label}</span>
+          </div>
+        </div>)}
+        <div className="absolute inset-0" style={{ background: bgTint }} />
         {showHandles && (
           <>
             <div data-resize onMouseDownCapture={(e)=>startResize(e,'e')} className="absolute top-1/2 right-0 -translate-y-1/2 translate-x-1/2 cursor-ew-resize bg-blue-500/80 hover:bg-blue-500 rounded-full shadow z-10" style={{ width: handleSize, height: handleSize }} />
