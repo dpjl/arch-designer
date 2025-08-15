@@ -30,6 +30,7 @@ import { Toolbar, PropertiesPanel, PalettePanel, ComponentNode, DoorNode, Networ
 import { useDiagramHistory } from './diagram/hooks/useDiagramHistory';
 import { useDiagramSelection } from './diagram/hooks/useDiagramSelection';
 import { applyZIndexHierarchy, enforceContainerSelectedZ, absolutePosition, headerOffsetFor as headerOffsetForUtil } from './diagram/layout-utils';
+import { applyPatternToEdge } from './diagram/edge-utils';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Trash2, Link2, Palette, Lock, Unlock, LayoutGrid, Boxes } from "lucide-react";
 import * as htmlToImage from 'html-to-image';
@@ -336,17 +337,7 @@ function DiagramCanvas() {
 
   // Node selection handled by hook
 
-  // Helper: apply dash / animated pattern CSS classes & strokeDasharray
-  const applyPatternToEdge = useCallback((e: any) => {
-    const pattern = e?.data?.pattern;
-    if (!pattern) return e;
-  let classNames = (e.className || '').split(/\s+/).filter(Boolean).filter((c: string) => !/^edge-(?:dashed|anim-dash)$/.test(c));
-    const style = { ...(e.style || {}) } as any;
-    if (pattern === 'dashed') { classNames.push('edge-dashed'); style.strokeDasharray = '6 6'; }
-    else if (pattern === 'animated') { classNames.push('edge-anim-dash'); style.strokeDasharray = '6 6'; }
-    else if (pattern === 'solid') { delete style.strokeDasharray; }
-    return { ...e, className: classNames.join(' '), style };
-  }, []);
+  // Edge style pattern utility imported
 
   // Helpers for ancestry
   const parentMapOf = (ns: any[]) => new Map(ns.map((n) => [n.id, n.parentNode]));
