@@ -28,6 +28,8 @@ import "reactflow/dist/style.css";
 import { Button } from "@/components/ui/button";
 import { Toolbar, PropertiesPanel, PalettePanel, ComponentNode, DoorNode, NetworkNode, MODES, GRID_SIZE, CONTAINER_HEADER_HEIGHT, NETWORK_HEADER_HEIGHT, DEFAULT_DOOR_WIDTH, DEFAULT_DOOR_HEIGHT, HISTORY_STORAGE_KEY, SNAP_STORAGE_KEY, hexToRgba, autoTextColor, isAncestor } from './diagram';
 import { useDiagramHistory } from './diagram/hooks/useDiagramHistory';
+import { useDiagramSelection } from './diagram/hooks/useDiagramSelection';
+import { applyZIndexHierarchy, enforceContainerSelectedZ, absolutePosition, headerOffsetFor as headerOffsetForUtil } from './diagram/layout-utils';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Trash2, Link2, Palette, Lock, Unlock, LayoutGrid, Boxes } from "lucide-react";
 import * as htmlToImage from 'html-to-image';
@@ -303,7 +305,7 @@ function DiagramCanvas() {
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges as any);
   const { historyRef, lastCommitRef, commitIfChanged, undo, redo } = useDiagramHistory(setNodes, setEdges, showFlash);
   useEffect(()=>{ (window as any).__showFlash = showFlash; },[showFlash]);
-  const [selection, setSelection] = useState<any>(null);
+  const { selection, setSelection, selectNode } = useDiagramSelection({ setNodes, setEdges, showFlash });
   // Networks present in the diagram (derived from nodes; stable IDs)
   type Network = { id: string; label: string; color: string };
   const [networks, setNetworks] = useState<Network[]>([]);
@@ -330,36 +332,9 @@ function DiagramCanvas() {
   // Track changes
   useEffect(()=>{ commitIfChanged(nodes, edges); }, [nodes, edges, commitIfChanged]);
   useEffect(()=>{ const handler=(e:KeyboardEvent)=>{ if((e.ctrlKey||e.metaKey)&&!e.shiftKey&&e.key.toLowerCase()==='z'){ e.preventDefault(); undo(); } else if((e.ctrlKey||e.metaKey)&&(e.key.toLowerCase()==='y'||(e.shiftKey&&e.key.toLowerCase()==='z'))){ e.preventDefault(); redo(); } }; window.addEventListener('keydown', handler); return ()=> window.removeEventListener('keydown', handler); },[undo,redo]);
-  // Delete key support (Delete/Backspace)
-  useEffect(() => {
-    const del = (e: KeyboardEvent) => {
-      if (e.key !== 'Delete' && e.key !== 'Backspace') return;
-      // ignore when typing in inputs
-      const tag = (e.target as HTMLElement)?.tagName?.toLowerCase();
-      if (tag === 'input' || tag === 'textarea' || (e.target as HTMLElement)?.isContentEditable) return;
-      e.preventDefault();
-      const anySelected = nodes.some(n=>n.selected) || edges.some(e=>e.selected);
-      if (anySelected) {
-        const ids = nodes.filter(n=>n.selected).map(n=>n.id);
-        (window as any).__deleteNodesCascade?.(ids);
-        setEdges(eds=>eds.filter(e=>!ids.includes(e.source) && !ids.includes(e.target)));
-        setSelection(null);
-        showFlash('Deleted selection');
-      } else if (selection) {
-        if (selection.type === 'node') setNodes(nds=>nds.filter(n=>n.id!==selection.id));
-        else setEdges(eds=>eds.filter(e=>e.id!==selection.id));
-        setSelection(null);
-        showFlash('Deleted');
-      }
-    };
-    window.addEventListener('keydown', del);
-    return () => window.removeEventListener('keydown', del);
-  }, [nodes, edges, selection, setNodes, setEdges, showFlash]);
+  // Keyboard delete handled inside useDiagramSelection when enabled (disabled here for duplication avoidance)
 
-  // Avoid selection-induced re-renders modifying node position: keep a stable snapshot
-  const stableSelectNode = useCallback((node: any) => {
-    setSelection({ ...node, type: "node", nodeType: (node as any)?.type, position: { ...node.position } });
-  }, []);
+  // Node selection handled by hook
 
   // Helper: apply dash / animated pattern CSS classes & strokeDasharray
   const applyPatternToEdge = useCallback((e: any) => {
@@ -382,57 +357,14 @@ function DiagramCanvas() {
   };
 
   // Absolute positioning helpers (for nested containers)
-  const headerOffsetFor = useCallback((n: any) => {
-    if (!n) return 0;
-    if (n.type === 'network') return NETWORK_HEADER_HEIGHT;
-    if (n.data?.isContainer) return CONTAINER_HEADER_HEIGHT;
-    return 0;
-  }, []);
-  const absoluteOf = useCallback((n: any): { x: number; y: number } => {
-    if (!n) return { x: 0, y: 0 };
-    let x = n.position.x;
-    let y = n.position.y;
-    let cur = n.parentNode ? nodes.find(nn => nn.id === n.parentNode) : null;
-    let guard = 0;
-    while (cur && guard++ < 100) {
-      x += cur.position.x;
-      y += cur.position.y + headerOffsetFor(cur);
-      const parentId = (cur as any).parentNode as string | undefined;
-      cur = parentId ? nodes.find(nn => nn.id === parentId) : null;
-    }
-    return { x, y };
-  }, [nodes, headerOffsetFor]);
+  const headerOffsetFor = useCallback((n:any)=>headerOffsetForUtil(n), []);
+  const absoluteOf = useCallback((n:any)=>absolutePosition(n, nodes), [nodes]);
 
   // Compute zIndex: strict parent < child ordering at all depths
-  useEffect(() => {
-    const pmap = parentMapOf(nodes);
-    const depthOf = (id: string) => { let d = 0, p = pmap.get(id) as string | undefined, guard = 0; while (p && guard++ < 100) { d++; p = pmap.get(p); } return d; };
-    // Larger spacing per depth to avoid overlaps; containers lower than children always
-    const BASE = 100;
-    const updates: Record<string, number> = {};
-    nodes.forEach((n) => {
-      const d = depthOf(n.id);
-      const isContainer = !!n.data?.isContainer;
-      const targetZ = isContainer ? d * BASE : d * BASE + 50; // children half-step above container at same depth
-      const currentZ = (n.style?.zIndex as number) ?? -Infinity;
-      if (currentZ !== targetZ) updates[n.id] = targetZ;
-    });
-    if (Object.keys(updates).length) {
-      setNodes((nds) => nds.map((n) => (updates[n.id] !== undefined ? { ...n, style: { ...(n.style || {}), zIndex: updates[n.id] } } : n)));
-    }
-  }, [nodes, setNodes]);
+  useEffect(()=>{ applyZIndexHierarchy(nodes, setNodes); }, [nodes, setNodes]);
 
   // Selection zIndex correction: keep containers at depth z-index even when selected
-  useEffect(() => {
-    if (!selection || selection.type !== 'node' || !selection.data?.isContainer) return;
-    setNodes((nds) => {
-      const pmap = parentMapOf(nds);
-      const depthOf = (id: string) => { let d = 0, p = pmap.get(id) as string | undefined, guard = 0; while (p && guard++ < 100) { d++; p = pmap.get(p); } return d; };
-      const d = depthOf(selection.id);
-      const z = d * 100; // align with BASE spacing logic
-      return nds.map((n) => (n.id === selection.id ? { ...n, style: { ...(n.style || {}), zIndex: z } } : n));
-    });
-  }, [selection, setNodes]);
+  useEffect(()=>{ enforceContainerSelectedZ(selection, setNodes); }, [selection, setNodes]);
 
   // Edge patterns CSS injection
   const EdgePatternStyles = () => (
@@ -667,8 +599,8 @@ function DiagramCanvas() {
 
   // Selection / connect
   const onNodeClick = useCallback((evt: any, node: any) => {
-    if (mode === MODES.EDIT) stableSelectNode(node);
-  }, [mode, stableSelectNode]);
+    if (mode === MODES.EDIT) selectNode(node);
+  }, [mode, selectNode]);
 
   const onEdgeClick = useCallback((_: any, edge: any) => { if (mode === MODES.EDIT) setSelection({ ...edge, type: "edge" }); }, [mode]);
 
