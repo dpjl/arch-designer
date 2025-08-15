@@ -1,4 +1,12 @@
 "use client";
+// ============================================================================
+// DiagramCanvas
+// Large composite client component. TODO: Progressive extraction into:
+//   components/diagram/Toolbar.tsx
+//   components/diagram/PalettePanel.tsx
+//   components/diagram/PropertiesPanel.tsx
+// Region markers below aid automated maintenance.
+// ============================================================================
 import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import ReactFlow, {
   ReactFlowProvider,
@@ -546,7 +554,9 @@ const NetworkNode = memo(({ id, data, selected }: any) => {
   );
 });
 
+// == Node Types Registry =====================================================
 const nodeTypes = { component: ComponentNode, door: DoorNode, network: NetworkNode } as const;
+// == End Node Types Registry =================================================
 
 // =============================
 // UI bits
@@ -554,6 +564,7 @@ const nodeTypes = { component: ComponentNode, door: DoorNode, network: NetworkNo
 const SectionTitle = ({ children }: { children: React.ReactNode }) => (
   <h4 className="text-xs font-medium text-slate-600 mb-2 uppercase tracking-wide">{children}</h4>
 );
+// == Toolbar Region ==========================================================
 function Toolbar({ mode, setMode, onSave, onLoad, onExportPng, onExportJson, onImportJson, onClear, onUndo, onRedo, canUndo, canRedo, snapEnabled, setSnapEnabled, onSnapAll }: any) {
   const [open, setOpen] = useState(false);
   const IconButton = ({ label, onClick, icon, active=false, disabled=false }: { label: string; onClick?: ()=>void; icon: React.ReactNode; active?: boolean; disabled?: boolean }) => (
@@ -609,6 +620,7 @@ function Toolbar({ mode, setMode, onSave, onLoad, onExportPng, onExportJson, onI
     </div>
   );
 }
+// == End Toolbar Region ======================================================
 
 function PaletteItem({ entry, onDragStart }: any) {
   return (
