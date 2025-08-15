@@ -1,0 +1,156 @@
+"use client";
+import React, { memo } from 'react';
+import { Handle, Position, useStore } from 'reactflow';
+import { Boxes, Lock, Unlock } from 'lucide-react';
+import { CONTAINER_HEADER_HEIGHT } from '../constants';
+import { hexToRgba, autoTextColor } from '../diagram-helpers';
+
+const getBrickTexture = typeof window !== 'undefined' && (window as any).__getBrickTexture
+  ? (window as any).__getBrickTexture
+  : () => ({ urlH:'', urlV:'', size:24, offX:0, offY:0, shiftTopY:0, shiftSideX:0 });
+
+const FeaturesIcons = ({ features, compact }: any) => {
+  const { auth1, auth2, hourglass } = features || {};
+  const cls = compact ? 'text-[11px]' : 'text-sm';
+  return (
+    <div className={`flex items-center gap-1 leading-none ${cls}`}>
+      {auth2 ? <span title="Double authentification" className="select-none">🔑🔑</span> : auth1 ? <span title="Authentification" className="select-none">🔑</span> : null}
+      {hourglass && <span title="En attente" className="select-none">⏳</span>}
+    </div>
+  );
+};
+
+interface ComponentNodeProps {
+  id: string;
+  data: any;
+  selected: boolean;
+  isConnectable: boolean;
+  xPos: number; yPos: number;
+}
+
+const ComponentNode = memo(({ id, data, selected, isConnectable }: ComponentNodeProps) => {
+  const zoom = useStore((s) => s.transform[2]);
+  const { label = 'Component', icon, color = '#94a3b8', features = {}, bgColor = '#ffffff', bgOpacity = 1, isContainer = false, width = 520, height = 320, locked = false } = data || {};
+  const showText = zoom >= 0.6;
+  const borderColor = color || '#94a3b8';
+  const bg = hexToRgba(bgColor, bgOpacity);
+  const handleSize = 10;
+  const showHandles = isContainer && selected && !locked;
+
+  const startResize = (e: React.MouseEvent, dir: string) => {
+    if (!isContainer) return;
+    e.preventDefault(); e.stopPropagation();
+    if ((e.nativeEvent as any)?.stopImmediatePropagation) (e.nativeEvent as any).stopImmediatePropagation();
+    const startX = e.clientX, startY = e.clientY; const startW = width, startH = height;
+    document.body.classList.add('resizing-container');
+    const move = (ev: MouseEvent) => {
+      let dw = ev.clientX - startX; let dh = ev.clientY - startY;
+      let newW = startW; let newH = startH;
+      if (dir.includes('e')) newW = Math.max(200, startW + dw);
+      if (dir.includes('s')) newH = Math.max(140, startH + dh);
+      if (dir.includes('w')) newW = Math.max(200, startW - dw);
+      if (dir.includes('n')) newH = Math.max(140, startH - dh);
+      const setNodesFn = (window as any).__setDiagramNodes;
+      if (typeof setNodesFn === 'function') {
+        setNodesFn((nds: any[]) => nds.map(n => n.id === id ? { ...n, draggable: false, data: { ...n.data, width: newW, height: newH }, style: { ...(n.style||{}), width: newW, height: newH } } : n));
+      }
+    };
+    const up = () => { window.removeEventListener('mousemove', move); window.removeEventListener('mouseup', up); document.body.classList.remove('resizing-container'); const setNodesFn = (window as any).__setDiagramNodes; if (typeof setNodesFn === 'function') setNodesFn((nds: any[]) => nds.map(n => n.id === id ? { ...n, draggable: true } : n)); };
+    window.addEventListener('mousemove', move); window.addEventListener('mouseup', up);
+  };
+
+  if (isContainer) {
+    const tex = getBrickTexture();
+    return (
+      <div className="relative" style={{ width, height, ['--fwtexH' as any]: features?.firewall ? `url('${tex.urlH}')` : undefined, ['--fwtexV' as any]: features?.firewall ? `url('${tex.urlV}')` : undefined, ['--fwtexSize' as any]: features?.firewall ? `${tex.size}px ${tex.size}px` : undefined, ['--fwtexOffX' as any]: `${tex.offX}px`, ['--fwtexOffY' as any]: `${tex.offY}px`, ['--fwShiftTopY' as any]: `${tex.shiftTopY}px`, ['--fwShiftSideX' as any]: `${tex.shiftSideX}px`, ['--ringGapInner' as any]: '8px', ['--ringThickness' as any]: '14px' }}>
+        {features?.firewall && (
+          <div className="firewall-ring rounded-2xl">
+            <div className="fw-top" />
+            <div className="fw-bottom" />
+            <div className="fw-left" />
+            <div className="fw-right" />
+            <div className="fw-badge" title="Firewall activé" aria-label="firewall">🛡️</div>
+          </div>
+        )}
+        <div className={`rounded-2xl overflow-hidden relative ${selected ? 'container-sel' : ''}`} style={{ width: '100%', height: '100%', border: `1px solid ${borderColor}`, background: bg, paddingTop: CONTAINER_HEADER_HEIGHT }}>
+          <div className="absolute top-0 left-0 right-0 flex items-center gap-3 px-3 py-2 bg-white/90 border-b" style={{ borderColor: borderColor, height: CONTAINER_HEADER_HEIGHT }}>
+            {icon ? (
+              <div className="h-8 w-8 rounded-xl bg-white/70 border flex items-center justify-center overflow-hidden shadow-sm">
+                <img src={icon} alt="" className="max-h-7 max-w-7 object-contain" />
+              </div>
+            ) : (
+              <Boxes className="h-5 w-5" />
+            )}
+            <div className="font-semibold text-gray-800 truncate" title={label}>{label}</div>
+            <div className="ml-auto flex items-center gap-2 text-xs text-slate-600">
+              <FeaturesIcons features={features} compact />
+              {locked ? <Lock className="h-3.5 w-3.5"/> : <Unlock className="h-3.5 w-3.5"/>}
+            </div>
+          </div>
+          {showHandles && (
+            <>
+              <div data-resize onMouseDownCapture={(e)=>startResize(e,'e')} className="absolute top-1/2 right-0 -translate-y-1/2 translate-x-1/2 cursor-ew-resize bg-blue-500/80 hover:bg-blue-500 rounded-full shadow z-10" style={{ width: handleSize, height: handleSize }} />
+              <div data-resize onMouseDownCapture={(e)=>startResize(e,'s')} className="absolute bottom-0 left-1/2 -translate-x-1/2 translate-y-1/2 cursor-ns-resize bg-blue-500/80 hover:bg-blue-500 rounded-full shadow z-10" style={{ width: handleSize, height: handleSize }} />
+              <div data-resize onMouseDownCapture={(e)=>startResize(e,'se')} className="absolute bottom-0 right-0 translate-x-1/3 translate-y-1/3 cursor-nwse-resize bg-blue-600 hover:bg-blue-500 rounded-md shadow z-10" style={{ width: handleSize+2, height: handleSize+2 }} />
+            </>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  const tex = getBrickTexture();
+  return (
+    <div className="relative inline-block" style={{ ['--fwtexH' as any]: features?.firewall ? `url('${tex.urlH}')` : undefined, ['--fwtexV' as any]: features?.firewall ? `url('${tex.urlV}')` : undefined, ['--fwtexSize' as any]: features?.firewall ? `${tex.size}px ${tex.size}px` : undefined, ['--fwtexOffX' as any]: `${tex.offX}px`, ['--fwtexOffY' as any]: `${tex.offY}px`, ['--fwShiftTopY' as any]: `${tex.shiftTopY}px`, ['--fwShiftSideX' as any]: `${tex.shiftSideX}px`, ['--ringGapInner' as any]: '5px', ['--ringThickness' as any]: '12px' }}>
+      {features?.firewall && (
+        <div className="firewall-ring rounded-2xl">
+          <div className="fw-top" />
+          <div className="fw-bottom" />
+          <div className="fw-left" />
+          <div className="fw-right" />
+          <div className="fw-badge" title="Firewall activé" aria-label="firewall">🛡️</div>
+        </div>
+      )}
+      <div className="group rounded-2xl shadow-lg px-2 py-1 w-[240px] hover:shadow-xl transition overflow-visible border relative" style={{ borderColor, background: bg }}>
+        {Array.isArray(data?.networkColors) && data.networkColors.length > 0 && (
+          <div className="absolute left-0 right-0 top-0 h-1.5 flex overflow-hidden rounded-t-2xl">
+            {data.networkColors.slice(0,8).map((c:string, i:number) => (<div key={i} className="flex-1" style={{ background: c }} />))}
+            {data.networkColors.length > 8 && <div className="px-1 text-[9px] leading-none bg-slate-50/80 text-slate-700">+{data.networkColors.length-8}</div>}
+          </div>
+        )}
+        {selected && <div className="absolute inset-0 rounded-2xl border-2 border-blue-500 pointer-events-none" />}
+        <Handle type="target" position={Position.Top} className={`handle-lg !bg-gray-500/80 transition-opacity ${selected ? 'opacity-100' : 'opacity-0'}`} isConnectable={isConnectable} />
+        <Handle type="source" position={Position.Bottom} className={`handle-lg !bg-gray-500/80 transition-opacity ${selected ? 'opacity-100' : 'opacity-0'}`} isConnectable={isConnectable} />
+        <Handle type="target" position={Position.Left} className={`handle-lg !bg-gray-500/80 transition-opacity ${selected ? 'opacity-100' : 'opacity-0'}`} isConnectable={isConnectable} />
+        <Handle type="source" position={Position.Right} className={`handle-lg !bg-gray-500/80 transition-opacity ${selected ? 'opacity-100' : 'opacity-0'}`} isConnectable={isConnectable} />
+        <div className="flex items-center gap-2 min-w-0">
+          {icon ? <img src={icon} alt="" className="h-7 w-7 object-contain rounded" /> : <div className="h-7 w-7 rounded bg-gray-200" />}
+          {showText && <div className="font-medium text-sm truncate flex-1" title={label || 'Unnamed'}>{label || 'Unnamed'}</div>}
+          <span className="inline-block h-2 w-2 rounded-full flex-shrink-0" style={{ background: borderColor }} />
+          <FeaturesIcons features={features} compact={!showText} />
+        </div>
+        {Array.isArray(data?.instances) && data.instances.length > 0 && (
+          (() => {
+            const list = data.instances as any[]; const MAX = 7; const shown = list.slice(0, MAX); const more = list.length - shown.length;
+            const short = (s?: string) => { const v = (s || 'inst').toString(); return v.length > 10 ? `${v.slice(0, 8)}…` : v; };
+            return (
+              <div className="absolute top-0 left-2 right-2 z-[5] pointer-events-none transform -translate-y-full">
+                <div className="flex items-end gap-1">
+                  {shown.map((ins: any, i: number) => (
+                    <div key={i} className="pointer-events-none px-1.5 py-0.5 rounded-t-lg border border-b-0 text-[10px] shadow-sm max-w-[100px] flex items-center gap-0.5" style={{ borderColor, background: ins?.bgColor ? ins.bgColor : 'linear-gradient(to bottom, #ffffff, #f8fafc)', color: ins?.fgColor ? ins.fgColor : (ins?.bgColor ? autoTextColor(ins.bgColor) : '#111827') }}>
+                      <span className="font-mono truncate" style={{ maxWidth: '66px' }}>{short(ins?.id)}</span>
+                      {ins?.auth ? (<span className="inline-flex flex-col leading-[0.8] text-[9px]"><span>🔑</span>{ins.auth === 'auth2' && <span>🔑</span>}</span>) : null}
+                    </div>
+                  ))}
+                  {more > 0 && (<div className="pointer-events-none px-2 py-0.5 rounded-t-lg border border-b-0 text-slate-600 text-[10px] shadow-sm bg-slate-50" style={{ borderColor }}>+{more}</div>)}
+                </div>
+              </div>
+            );
+          })()
+        )}
+      </div>
+    </div>
+  );
+});
+
+export default ComponentNode;

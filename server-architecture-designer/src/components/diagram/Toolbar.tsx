@@ -2,7 +2,7 @@
 import React, { useState } from 'react';
 import { LayoutGrid, Eye, Pencil, Upload, Save, Boxes, Magnet, FileDown, FileUp, Eraser, CornerUpLeft, CornerUpRight, Image as ImageIcon } from 'lucide-react';
 import IconButton from './IconButton';
-import { MODES } from '../DiagramCanvas';
+import { MODES } from './constants';
 
 export interface ToolbarProps {
   mode: typeof MODES[keyof typeof MODES];
