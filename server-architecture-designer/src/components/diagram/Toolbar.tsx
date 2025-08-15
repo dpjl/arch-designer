@@ -1,8 +1,7 @@
 "use client";
 import React, { useState } from 'react';
 import { LayoutGrid, Eye, Pencil, Upload, Save, Boxes, Magnet, FileDown, FileUp, Eraser, CornerUpLeft, CornerUpRight, Image as ImageIcon } from 'lucide-react';
-import * as TooltipPrimitive from '@radix-ui/react-tooltip';
-import { TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
+import IconButton from './IconButton';
 import { MODES } from '../DiagramCanvas';
 
 export interface ToolbarProps {
@@ -22,23 +21,6 @@ export interface ToolbarProps {
   setSnapEnabled: (v:boolean)=>void;
   onSnapAll: ()=>void;
 }
-
-const IconButton = ({ label, onClick, icon, active=false, disabled=false }: { label: string; onClick?: ()=>void; icon: React.ReactNode; active?: boolean; disabled?: boolean }) => (
-  <TooltipPrimitive.Root delayDuration={150}>
-    <TooltipTrigger asChild>
-      <button
-        type="button"
-        aria-label={label}
-        disabled={disabled}
-        onClick={onClick}
-        className={`h-8 w-8 rounded-md flex items-center justify-center transition-colors disabled:opacity-40 ${active ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'}`}
-      >
-        {icon}
-      </button>
-    </TooltipTrigger>
-    <TooltipContent sideOffset={4}>{label}</TooltipContent>
-  </TooltipPrimitive.Root>
-);
 
 export function Toolbar(props: ToolbarProps) {
   const { mode, setMode, onSave, onLoad, onExportPng, onExportJson, onImportJson, onClear, onUndo, onRedo, canUndo, canRedo, snapEnabled, setSnapEnabled, onSnapAll } = props;

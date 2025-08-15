@@ -31,28 +31,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
-import * as TooltipPrimitive from '@radix-ui/react-tooltip';
-import {
-  LayoutGrid,
-  Eye,
-  Pencil,
-  Upload,
-  Save,
-  Trash2,
-  Link2,
-  Palette,
-  Image as ImageIcon,
-  Boxes,
-  Lock,
-  Unlock,
-  CornerUpLeft,
-  CornerUpRight,
-  Magnet,
-  FileDown,
-  FileUp,
-  Eraser,
-} from "lucide-react";
+import { Trash2, Link2, Palette, Lock, Unlock, LayoutGrid, Boxes } from "lucide-react";
 import * as htmlToImage from "html-to-image";
 // Helper for background opacity
 function hexToRgba(hex: string, alpha: number) {
@@ -565,7 +544,7 @@ const SectionTitle = ({ children }: { children: React.ReactNode }) => (
   <h4 className="text-xs font-medium text-slate-600 mb-2 uppercase tracking-wide">{children}</h4>
 );
 // Toolbar extracted
-import Toolbar from './diagram/Toolbar';
+import { Toolbar } from './diagram';
 // == End Toolbar Region ======================================================
 
 function PaletteItem({ entry, onDragStart }: any) {
