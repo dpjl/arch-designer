@@ -323,7 +323,8 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({ selection, onC
                   {id:'step', svg:<svg width="48" height="18"><path d="M2 14 H24 V4 H46" stroke="#475569" strokeWidth={2} fill="none" strokeLinecap="round"/></svg>, title:'Angles', type:'step'},
                 ].map(opt => {
                   const active = (selection.data?.shape || 'smooth') === opt.id;
-                  return <button key={opt.id} type="button" title={opt.title} onClick={() => onChange({ type: opt.type, data:{...(selection.data||{}), shape:opt.id}})} className={`h-10 w-14 flex items-center justify-center rounded-md border ${active?'bg-blue-50 border-blue-500':'bg-white hover:bg-slate-50'}`}>{opt.svg}</button>;
+                  return <button key={opt.id} type="button" title={opt.title} onClick={() => onChange({ type: opt.type, data:{...(selection.data||{}), shape:opt.id}})} className={`h-10 w-14 flex items-center justify-center rounded-md border transition-colors
+                    ${active ? 'bg-blue-50 dark:bg-blue-500/20 border-blue-500 dark:border-blue-400 shadow-sm' : 'bg-white dark:bg-slate-700/60 border-slate-200 dark:border-slate-600 hover:bg-slate-50 dark:hover:bg-slate-600'}`}>{opt.svg}</button>;
                 })}
               </div>
             </div>
@@ -336,7 +337,8 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({ selection, onC
                   {id:'animated', dash:'6 6', title:'Animé', anim:true},
                 ].map(opt => {
                   const active = (selection.data?.pattern || 'solid') === opt.id;
-                  return <button key={opt.id} type="button" title={opt.title} onClick={()=> onChange({ data:{...(selection.data||{}), pattern: opt.id } })} className={`h-10 w-14 flex items-center justify-center rounded-md border ${active?'bg-blue-50 border-blue-500':'bg-white hover:bg-slate-50'}`}>
+                  return <button key={opt.id} type="button" title={opt.title} onClick={()=> onChange({ data:{...(selection.data||{}), pattern: opt.id } })} className={`h-10 w-14 flex items-center justify-center rounded-md border transition-colors
+                    ${active?'bg-blue-50 dark:bg-blue-500/20 border-blue-500 dark:border-blue-400 shadow-sm':'bg-white dark:bg-slate-700/60 border-slate-200 dark:border-slate-600 hover:bg-slate-50 dark:hover:bg-slate-600'}`}>
                     <svg width="48" height="18"><line x1="2" y1="9" x2="46" y2="9" stroke="#475569" strokeWidth={2} strokeDasharray={opt.dash} strokeLinecap="round">{opt.anim && <animate attributeName="stroke-dashoffset" from="0" to="-20" dur="1s" repeatCount="indefinite" />}</line></svg>
                   </button>;
                 })}
@@ -345,7 +347,8 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({ selection, onC
             <div className="space-y-1">
               <SectionTitle>Épaisseur</SectionTitle>
               <div className="flex gap-2 flex-wrap">
-                {[1,2,3,4,6].map(w => { const active=(selection.style?.strokeWidth||2)===w; return <button key={w} type="button" title={`Épaisseur ${w}`} onClick={()=> onChange({ style:{...(selection.style||{}), strokeWidth:w } })} className={`h-9 px-2 flex items-center justify-center rounded-md border min-w-[44px] ${active?'bg-blue-50 border-blue-500':'bg-white hover:bg-slate-50'}`}><div className="w-8"><svg width="32" height={w+4}><line x1="0" y1={w/2+2} x2="32" y2={w/2+2} stroke="#475569" strokeWidth={w} strokeLinecap="round"/></svg></div></button>; })}
+                {[1,2,3,4,6].map(w => { const active=(selection.style?.strokeWidth||2)===w; return <button key={w} type="button" title={`Épaisseur ${w}`} onClick={()=> onChange({ style:{...(selection.style||{}), strokeWidth:w } })} className={`h-9 px-2 flex items-center justify-center rounded-md border min-w-[44px] transition-colors
+                  ${active?'bg-blue-50 dark:bg-blue-500/20 border-blue-500 dark:border-blue-400 shadow-sm':'bg-white dark:bg-slate-700/60 border-slate-200 dark:border-slate-600 hover:bg-slate-50 dark:hover:bg-slate-600'}`}><div className="w-8"><svg width="32" height={w+4}><line x1="0" y1={w/2+2} x2="32" y2={w/2+2} stroke="#475569" strokeWidth={w} strokeLinecap="round"/></svg></div></button>; })}
               </div>
             </div>
             <div className="space-y-1">

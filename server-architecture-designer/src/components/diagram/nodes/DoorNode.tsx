@@ -1,5 +1,6 @@
 "use client";
 import React, { memo } from 'react';
+import { useTheme } from '../../theme/ThemeProvider';
 import { Handle, Position } from 'reactflow';
 import { DEFAULT_DOOR_WIDTH, DEFAULT_DOOR_HEIGHT } from '../constants';
 
@@ -16,13 +17,19 @@ const DoorNode = memo(({ data, selected }: DoorNodeProps) => {
   const barrierH = Math.max(8, Math.round(doorH * 0.36));
   const rotate = side === 'left' ? -90 : side === 'right' ? 90 : 0;
   const barrierAngle = (side === 'bottom' || side === 'right') ? 25 : -25;
+  const { resolvedTheme } = useTheme();
+  const isDark = resolvedTheme === 'dark';
+  const panelBg = isDark ? '#1e293b' : '#ffffff';
+  const panelFg = isDark ? '#f1f5f9' : '#000000';
+  const stripeLight = isDark ? '#ef4444' : '#ef4444';
+  const stripeAlt = isDark ? '#334155' : '#ffffff';
   return (
     <div className="relative select-none" style={{ width: doorW, height: doorH }}>
       <div className="absolute inset-0" style={{ transform: `rotate(${rotate}deg)`, transformOrigin: 'center' }}>
-        <div className="absolute transition-transform duration-200 ease-out group-hover:rotate-[5deg]" style={{ zIndex: 3, height: barrierH, width: barrierL, background: 'repeating-linear-gradient(45deg, #ef4444 0 10px, #ffffff 10px 20px)', border: '2px solid #000', top: '50%', left: 0, transform: `translate(0, -50%) rotate(${barrierAngle}deg)`, transformOrigin: 'left center', borderRadius: 4, boxShadow: '0 1px 3px rgba(0,0,0,0.25)' }} />
+  <div className="absolute transition-transform duration-200 ease-out group-hover:rotate-[5deg]" style={{ zIndex: 3, height: barrierH, width: barrierL, background: `repeating-linear-gradient(45deg, ${stripeLight} 0 10px, ${stripeAlt} 10px 20px)`, border: '2px solid ' + (isDark ? '#0f172a' : '#000'), top: '50%', left: 0, transform: `translate(0, -50%) rotate(${barrierAngle}deg)`, transformOrigin: 'left center', borderRadius: 4, boxShadow: '0 1px 3px rgba(0,0,0,0.35)' }} />
         <div className="relative h-full w-full flex items-stretch">
           <div className="bg-black" style={{ width: sideW }} />
-          <div className="flex-1 bg-white text-black flex items-center justify-center px-3 relative overflow-visible">
+          <div className="flex-1 flex items-center justify-center px-3 relative overflow-visible" style={{ background: panelBg, color: panelFg }}>
             <span className="mr-1" aria-hidden>{lockedIcon ? '🔒' : ''}</span>
             <span className="uppercase tracking-wide font-bold" style={{ fontSize }}>{allow}</span>
             <Handle type="target" position={Position.Left} className={`handle-lg !bg-gray-600/90 transition-opacity ${selected ? 'opacity-100' : 'opacity-0'}`} style={{ position:'absolute', top:'50%', left:'50%', transform:'translate(-50%, -50%)', zIndex:5 }} />
