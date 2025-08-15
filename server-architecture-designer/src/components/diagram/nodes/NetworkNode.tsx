@@ -34,7 +34,7 @@ const NetworkNode = memo(({ id, data, selected }: NetworkNodeProps) => {
   return (
     <div className="relative" style={{ width, height }}>
       {selected && <div className="absolute inset-0 -m-1 rounded-2xl ring-2 ring-blue-500 pointer-events-none" />}
-      <div className="rounded-2xl overflow-hidden relative border shadow-sm" style={{ borderColor: color, width: '100%', height: '100%', paddingTop: headerPos==='top'?0:0, paddingLeft: headerPos==='left'?0:0 }}>
+  <div className="rounded-2xl relative border shadow-sm overflow-visible" style={{ borderColor: color, width: '100%', height: '100%' }}>
         {headerPos==='top' && (
         <div className="absolute top-0 left-1/2 -translate-x-1/2 z-[2] -translate-y-1/2">
           <div className="relative px-3 py-1.5 rounded-full border shadow flex items-center gap-2" style={{ background: color, color: text, borderColor: color }}>
@@ -53,9 +53,9 @@ const NetworkNode = memo(({ id, data, selected }: NetworkNodeProps) => {
             <span className="relative z-[1] text-[12px] font-semibold truncate max-w-[200px]" title={label}>{label}</span>
           </div>
         </div>)}
-        {headerPos==='left' && (
-        <div className="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-1/2 z-[2] rotate-90 origin-left">
-          <div className="relative px-3 py-1.5 rounded-full border shadow flex items-center gap-2" style={{ background: color, color: text, borderColor: color }}>
+  {headerPos==='left' && (
+        <div className="absolute top-1/2 left-0 -translate-y-1/2 z-[2] overflow-visible">
+          <div className="relative -translate-x-1/2 -rotate-90 [transform-origin:center] px-3 py-1.5 rounded-full border shadow flex items-center gap-2" style={{ background: color, color: text, borderColor: color }}>
             <div className="pointer-events-none absolute inset-0 rounded-full" style={{ background: 'linear-gradient(to bottom, rgba(255,255,255,0.24), rgba(255,255,255,0))' }} />
             <div className="pointer-events-none absolute inset-0 rounded-full border-2 border-dashed opacity-40" style={{ borderColor: text }} />
             <div className="relative z-[1] h-6 w-6 rounded-full flex items-center justify-center" style={{ background: 'rgba(0,0,0,0.08)' }}>
@@ -71,7 +71,7 @@ const NetworkNode = memo(({ id, data, selected }: NetworkNodeProps) => {
             <span className="relative z-[1] text-[12px] font-semibold truncate max-w-[200px]" title={label}>{label}</span>
           </div>
         </div>)}
-        <div className="absolute inset-0" style={{ background: bgTint }} />
+  <div className="absolute inset-0 rounded-2xl overflow-hidden" style={{ background: bgTint }} />
         {showHandles && (
           <>
             <div data-resize onMouseDownCapture={(e)=>startResize(e,'e')} className="absolute top-1/2 right-0 -translate-y-1/2 translate-x-1/2 cursor-ew-resize bg-blue-500/80 hover:bg-blue-500 rounded-full shadow z-10" style={{ width: handleSize, height: handleSize }} />
