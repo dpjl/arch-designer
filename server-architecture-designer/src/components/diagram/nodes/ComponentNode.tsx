@@ -62,7 +62,7 @@ const ComponentNode = memo(({ id, data, selected, isConnectable }: ComponentNode
   const zoom = useStore((s) => s.transform[2]);
   const { resolvedTheme } = useTheme();
   const isDark = resolvedTheme === 'dark';
-  const { label = 'Component', icon, color, features = {}, bgColor, bgOpacity = 1, isContainer = false, width = 520, height = 320, locked = false } = data || {};
+  const { label = 'Component', icon, color, features = {}, bgColor, bgOpacity = 1, isContainer = false, width = 520, height = 320, locked = false, widthMode = 'fixed', customWidth } = data || {};
   const borderColor = effectiveBorderColor(color, isDark);
   const baseBg = effectiveBgColor(bgColor, isDark);
   const bg = hexToRgba(baseBg, bgOpacity);
@@ -152,6 +152,14 @@ const ComponentNode = memo(({ id, data, selected, isConnectable }: ComponentNode
   }
 
   const tex = getBrickTexture();
+  // Service node width computation
+  let serviceWidth: number | undefined;
+  if (widthMode === 'fixed') {
+    serviceWidth = 240; // legacy fixed width
+  } else if (widthMode === 'custom') {
+    serviceWidth = Math.max(140, Math.min(800, customWidth || 240));
+  } // auto: undefined => shrink to fit via inline-flex
+
   return (
     <div className="relative inline-block" style={{ ['--fwtexH' as any]: features?.firewall ? `url('${tex.urlH}')` : undefined, ['--fwtexV' as any]: features?.firewall ? `url('${tex.urlV}')` : undefined, ['--fwtexSize' as any]: features?.firewall ? `${tex.size}px ${tex.size}px` : undefined, ['--fwtexOffX' as any]: `${tex.offX}px`, ['--fwtexOffY' as any]: `${tex.offY}px`, ['--fwShiftTopY' as any]: `${tex.shiftTopY}px`, ['--fwShiftSideX' as any]: `${tex.shiftSideX}px`, ['--ringGapInner' as any]: '5px', ['--ringThickness' as any]: '12px' }}>
         {features?.firewall && (
@@ -163,7 +171,8 @@ const ComponentNode = memo(({ id, data, selected, isConnectable }: ComponentNode
             <div className="fw-badge dark:!bg-amber-400/90 dark:!text-slate-900 dark:!border-amber-500" title="Firewall activé" aria-label="firewall">🛡️</div>
         </div>
       )}
-  <div className="group rounded-2xl shadow-lg px-2 py-1 w-[240px] hover:shadow-xl transition overflow-visible border relative dark:shadow-slate-950/40" style={{ borderColor, background: bg }}>
+  <div className={"group rounded-2xl shadow-lg px-2 py-1 hover:shadow-xl transition overflow-visible border relative dark:shadow-slate-950/40 " + (widthMode==='auto' ? ' inline-flex items-center' : '')}
+       style={{ borderColor, background: bg, width: serviceWidth }}>
         {Array.isArray(data?.networkColors) && data.networkColors.length > 0 && (
           <div className="absolute left-0 right-0 top-0 h-1.5 flex overflow-hidden rounded-t-2xl">
             {data.networkColors.slice(0,8).map((c:string, i:number) => (<div key={i} className="flex-1" style={{ background: c }} />))}

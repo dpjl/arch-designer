@@ -186,6 +186,20 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({ selection, onC
             )}
             {!isDoor && !isContainer && !isNetwork && (
               <div className="space-y-2">
+                <SectionTitle>Largeur</SectionTitle>
+                <div className="flex gap-2">
+                  {['fixed','auto','custom'].map(mode=>{ const active=(selection.data.widthMode||'fixed')===mode; return <button key={mode} type="button" onClick={()=> onChange({ data:{...selection.data, widthMode:mode } })} className={`px-3 h-8 rounded-md text-[11px] border capitalize ${active?'bg-blue-500 text-white border-blue-500':'bg-slate-100 dark:bg-slate-700 border-slate-300 dark:border-slate-600 hover:bg-slate-200 dark:hover:bg-slate-600'}`}>{mode}</button>; })}
+                </div>
+                {(selection.data.widthMode==='custom') && (
+                  <div className="flex items-center gap-2">
+                    <input type="range" min={140} max={800} step={10} value={selection.data.customWidth || 240} onChange={(e)=> onChange({ data:{...selection.data, customWidth: parseInt(e.target.value,10) } })} className="flex-1" />
+                    <Input type="number" className="w-24" value={selection.data.customWidth || 240} onChange={(e)=> onChange({ data:{...selection.data, customWidth: parseInt(e.target.value,10)||240 } })} />
+                  </div>
+                )}
+              </div>
+            )}
+            {!isDoor && !isContainer && !isNetwork && (
+              <div className="space-y-2">
                 <SectionTitle>Instances</SectionTitle>
                 <div className="space-y-2">
                   {(selection.data.instances || []).map((ins: any, idx: number) => {
