@@ -1,5 +1,5 @@
 "use client";
-import React, { memo } from 'react';
+import React, { memo, useLayoutEffect, useRef, useState } from 'react';
 import { Handle, Position, useStore } from 'reactflow';
 import { Boxes, Lock, Unlock } from 'lucide-react';
 import { useTheme } from '../../theme/ThemeProvider';
@@ -63,6 +63,8 @@ const ComponentNode = memo(({ id, data, selected, isConnectable }: ComponentNode
   const { resolvedTheme } = useTheme();
   const isDark = resolvedTheme === 'dark';
   const { label = 'Component', icon, color, features = {}, bgColor, bgOpacity = 1, isContainer = false, width = 520, height = 320, locked = false, widthMode = 'fixed', customWidth } = data || {};
+  const autoRef = useRef<HTMLDivElement|null>(null);
+  const [autoW, setAutoW] = useState<number>();
   const borderColor = effectiveBorderColor(color, isDark);
   const baseBg = effectiveBgColor(bgColor, isDark);
   const bg = hexToRgba(baseBg, bgOpacity);
@@ -160,6 +162,27 @@ const ComponentNode = memo(({ id, data, selected, isConnectable }: ComponentNode
     serviceWidth = Math.max(140, Math.min(800, customWidth || 240));
   } // auto: undefined => shrink to fit via inline-flex
 
+  // Measure auto width (content + instance tabs) after paint
+  useLayoutEffect(() => {
+    if (widthMode !== 'auto') { setAutoW(undefined); return; }
+    const el = autoRef.current; if (!el) return;
+    // base content width
+    let w = el.firstElementChild ? (el.firstElementChild as HTMLElement).offsetWidth : el.scrollWidth;
+    // instance tabs container (absolute) sized by its inner flex children
+    const tabs = el.querySelector('[data-instance-tabs]') as HTMLElement | null;
+    if (tabs) {
+      // width of visible tabs row
+      const row = tabs.querySelector('div.flex');
+      if (row) {
+        const rowW = (row as HTMLElement).scrollWidth + 16; // padding margin allowance
+        if (rowW > w) w = rowW;
+      }
+    }
+    // clamp & apply minimal aesthetic constraints
+    w = Math.max(140, Math.min(w, 1000));
+    if (Math.abs((autoW||0) - w) > 2) setAutoW(w);
+  }, [widthMode, label, color, bgColor, data?.instances, features, customWidth]);
+
   return (
     <div className="relative inline-block" style={{ ['--fwtexH' as any]: features?.firewall ? `url('${tex.urlH}')` : undefined, ['--fwtexV' as any]: features?.firewall ? `url('${tex.urlV}')` : undefined, ['--fwtexSize' as any]: features?.firewall ? `${tex.size}px ${tex.size}px` : undefined, ['--fwtexOffX' as any]: `${tex.offX}px`, ['--fwtexOffY' as any]: `${tex.offY}px`, ['--fwShiftTopY' as any]: `${tex.shiftTopY}px`, ['--fwShiftSideX' as any]: `${tex.shiftSideX}px`, ['--ringGapInner' as any]: '5px', ['--ringThickness' as any]: '12px' }}>
         {features?.firewall && (
@@ -171,8 +194,8 @@ const ComponentNode = memo(({ id, data, selected, isConnectable }: ComponentNode
             <div className="fw-badge dark:!bg-amber-400/90 dark:!text-slate-900 dark:!border-amber-500" title="Firewall activé" aria-label="firewall">🛡️</div>
         </div>
       )}
-  <div className={"group rounded-2xl shadow-lg px-2 py-1 hover:shadow-xl transition overflow-visible border relative dark:shadow-slate-950/40 " + (widthMode==='auto' ? ' inline-flex items-center' : '')}
-       style={{ borderColor, background: bg, width: serviceWidth }}>
+  <div ref={widthMode==='auto'?autoRef:undefined} className={"group rounded-2xl shadow-lg px-2 py-1 hover:shadow-xl transition overflow-visible border relative dark:shadow-slate-950/40 " + (widthMode==='auto' ? ' inline-flex items-center' : '')}
+       style={{ borderColor, background: bg, width: serviceWidth, minWidth: widthMode==='auto' ? (autoW ? autoW : undefined) : undefined }}>
         {Array.isArray(data?.networkColors) && data.networkColors.length > 0 && (
           <div className="absolute left-0 right-0 top-0 h-1.5 flex overflow-hidden rounded-t-2xl">
             {data.networkColors.slice(0,8).map((c:string, i:number) => (<div key={i} className="flex-1" style={{ background: c }} />))}
@@ -195,7 +218,7 @@ const ComponentNode = memo(({ id, data, selected, isConnectable }: ComponentNode
             const list = data.instances as any[]; const MAX = 7; const shown = list.slice(0, MAX); const more = list.length - shown.length;
             const short = (s?: string) => { const v = (s || 'inst').toString(); return v.length > 10 ? `${v.slice(0, 8)}…` : v; };
             return (
-              <div className="absolute top-0 left-2 right-2 z-[5] pointer-events-none transform -translate-y-full">
+              <div className="absolute top-0 left-2 right-2 z-[5] pointer-events-none transform -translate-y-full" data-instance-tabs>
                 <div className="flex items-end gap-1">
                   {shown.map((ins: any, i: number) => (
                     <div key={i} className="pointer-events-none px-1.5 py-0.5 rounded-t-lg border border-b-0 text-[10px] shadow-sm max-w-[100px] flex items-center gap-0.5" style={{ borderColor, background: ins?.bgColor ? ins.bgColor : 'linear-gradient(to bottom, #ffffff, #f8fafc)', color: ins?.fgColor ? ins.fgColor : (ins?.bgColor ? autoTextColor(ins.bgColor) : '#111827') }}>
