@@ -166,22 +166,26 @@ const ComponentNode = memo(({ id, data, selected, isConnectable }: ComponentNode
   useLayoutEffect(() => {
     if (widthMode !== 'auto') { setAutoW(undefined); return; }
     const el = autoRef.current; if (!el) return;
-    // base content width
-    let w = el.firstElementChild ? (el.firstElementChild as HTMLElement).offsetWidth : el.scrollWidth;
-    // instance tabs container (absolute) sized by its inner flex children
-    const tabs = el.querySelector('[data-instance-tabs]') as HTMLElement | null;
-    if (tabs) {
-      // width of visible tabs row
-      const row = tabs.querySelector('div.flex');
-      if (row) {
-        const rowW = (row as HTMLElement).scrollWidth + 16; // padding margin allowance
-        if (rowW > w) w = rowW;
-      }
+    // Temporarily allow content to shrink so we can measure intrinsic width
+    const prevWidth = el.style.width;
+    const prevMinWidth = el.style.minWidth;
+    el.style.width = 'fit-content';
+    el.style.minWidth = '0';
+    // Measure base content width (exclude absolute tabs)
+    let w = el.scrollWidth;
+    // Measure instance tabs (absolute) and ensure container can fit them
+    const tabs = el.querySelector('[data-instance-tabs] .flex');
+    if (tabs instanceof HTMLElement) {
+      const tabsW = tabs.scrollWidth + 16; // small padding allowance
+      if (tabsW > w) w = tabsW;
     }
-    // clamp & apply minimal aesthetic constraints
+    // Clamp
     w = Math.max(140, Math.min(w, 1000));
-    if (Math.abs((autoW||0) - w) > 2) setAutoW(w);
-  }, [widthMode, label, color, bgColor, data?.instances, features, customWidth]);
+    // Restore before applying state to avoid flicker
+    el.style.width = prevWidth;
+    el.style.minWidth = prevMinWidth;
+    if (!autoW || Math.abs(autoW - w) > 0.5) setAutoW(w);
+  }, [widthMode, label, data?.instances, features, icon, borderColor, bgColor, customWidth]);
 
   return (
     <div className="relative inline-block" style={{ ['--fwtexH' as any]: features?.firewall ? `url('${tex.urlH}')` : undefined, ['--fwtexV' as any]: features?.firewall ? `url('${tex.urlV}')` : undefined, ['--fwtexSize' as any]: features?.firewall ? `${tex.size}px ${tex.size}px` : undefined, ['--fwtexOffX' as any]: `${tex.offX}px`, ['--fwtexOffY' as any]: `${tex.offY}px`, ['--fwShiftTopY' as any]: `${tex.shiftTopY}px`, ['--fwShiftSideX' as any]: `${tex.shiftSideX}px`, ['--ringGapInner' as any]: '5px', ['--ringThickness' as any]: '12px' }}>
@@ -195,7 +199,7 @@ const ComponentNode = memo(({ id, data, selected, isConnectable }: ComponentNode
         </div>
       )}
   <div ref={widthMode==='auto'?autoRef:undefined} className={"group rounded-2xl shadow-lg px-2 py-1 hover:shadow-xl transition overflow-visible border relative dark:shadow-slate-950/40 " + (widthMode==='auto' ? ' inline-flex items-center' : '')}
-       style={{ borderColor, background: bg, width: serviceWidth, minWidth: widthMode==='auto' ? (autoW ? autoW : undefined) : undefined }}>
+       style={{ borderColor, background: bg, width: widthMode==='auto' ? (autoW? `${autoW}px` : undefined) : serviceWidth }}>
         {Array.isArray(data?.networkColors) && data.networkColors.length > 0 && (
           <div className="absolute left-0 right-0 top-0 h-1.5 flex overflow-hidden rounded-t-2xl">
             {data.networkColors.slice(0,8).map((c:string, i:number) => (<div key={i} className="flex-1" style={{ background: c }} />))}
