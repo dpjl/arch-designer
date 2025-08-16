@@ -205,7 +205,8 @@ const ComponentNode = memo(({ id, data, selected, isConnectable }: ComponentNode
   <div ref={widthMode==='auto'?autoRef:undefined} className={"group rounded-2xl shadow-lg px-2 pt-1 pb-1 hover:shadow-xl transition overflow-visible border relative dark:shadow-slate-950/40 " + (widthMode==='auto' ? ' inline-flex items-center' : '')}
        style={{ borderColor, background: bg, width: widthMode==='auto' ? (autoW? `${autoW}px` : undefined) : serviceWidth }}>
         {hasNetworks && (
-          <div className="pointer-events-none absolute top-[1px] left-[1px] right-[1px] h-1.5 flex overflow-hidden rounded-t-[1rem]" style={{ mask: 'linear-gradient(#000,#000)', WebkitMask: 'linear-gradient(#000,#000)' }}>
+          <div className="pointer-events-none absolute h-1.5 flex overflow-hidden"
+               style={{ top:0, left:4, right:4, borderTopLeftRadius:'calc(1rem - 4px)', borderTopRightRadius:'calc(1rem - 4px)', clipPath:'inset(0 0 0 0 round calc(1rem - 4px) calc(1rem - 4px) 0 0)' }}>
             {data.networkColors.slice(0,8).map((c:string, i:number) => (<div key={i} className="flex-1" style={{ background: c }} />))}
             {data.networkColors.length > 8 && <div className="px-1 text-[9px] leading-none bg-slate-50/80 text-slate-700">+{data.networkColors.length-8}</div>}
           </div>
