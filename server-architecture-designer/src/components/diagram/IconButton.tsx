@@ -20,12 +20,13 @@ export const IconButton: React.FC<IconButtonProps> = ({ label, icon, onClick, ac
         aria-label={label}
         disabled={disabled}
         onClick={onClick}
-        className={`h-8 w-8 rounded-md flex items-center justify-center transition-colors disabled:opacity-40 ${active ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'} ${className}`}
+        className={`h-8 w-8 rounded-md flex items-center justify-center transition-colors disabled:opacity-40 
+          ${active ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-900' : 'bg-slate-100 text-slate-700 hover:bg-slate-200 dark:bg-slate-700 dark:text-slate-200 dark:hover:bg-slate-600'} ${className}`}
       >
         {icon}
       </button>
     </TooltipTrigger>
-    <TooltipContent sideOffset={4}>{label}</TooltipContent>
+  <TooltipContent sideOffset={4} className="bg-slate-900 text-white dark:bg-slate-200 dark:text-slate-900">{label}</TooltipContent>
   </TooltipPrimitive.Root>
 );
 

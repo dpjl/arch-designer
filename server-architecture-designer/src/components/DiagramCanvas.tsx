@@ -35,6 +35,7 @@ import { applyPatternToEdge } from './diagram/edge-utils';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Trash2, Link2, Palette, Lock, Unlock, LayoutGrid, Boxes } from "lucide-react";
 import * as htmlToImage from 'html-to-image';
+import jsPDF from 'jspdf';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { Input } from "@/components/ui/input";
 // PaletteItem moved into PalettePanel
@@ -83,7 +84,7 @@ function exclusiveAuthToggle(
 import { CATALOG } from '@/lib/catalog';
 // Responsive condensed toolbar pieces (mobile first)
 const MobileMenu = memo(({
-  mode, setMode, onSave, onLoad, onExportPng, onExportJson, onImportJson, onClear, undo, redo, canUndo, canRedo, snapEnabled, setSnapEnabled, onSnapAll
+  mode, setMode, onSave, onLoad, onExportPng, onExportPdf, onExportJson, onImportJson, onClear, undo, redo, canUndo, canRedo, snapEnabled, setSnapEnabled, onSnapAll
 }: any) => {
   const [open, setOpen] = useState(false);
   return (
@@ -101,6 +102,7 @@ const MobileMenu = memo(({
             <button onClick={onSave} className="px-2 py-1 rounded bg-slate-100 hover:bg-slate-200">Save</button>
             <button onClick={onLoad} className="px-2 py-1 rounded bg-slate-100 hover:bg-slate-200">Load</button>
             <button onClick={onExportPng} className="px-2 py-1 rounded bg-slate-100 hover:bg-slate-200">PNG</button>
+            <button onClick={onExportPdf} className="px-2 py-1 rounded bg-slate-100 hover:bg-slate-200">PDF</button>
             <button onClick={onExportJson} className="px-2 py-1 rounded bg-slate-100 hover:bg-slate-200">JSON</button>
             <button onClick={onImportJson} className="px-2 py-1 rounded bg-slate-100 hover:bg-slate-200">Import</button>
             <button onClick={onClear} className="px-2 py-1 rounded bg-rose-100 hover:bg-rose-200 text-rose-700">Clear</button>
@@ -772,6 +774,31 @@ function DiagramCanvas() {
     link.click();
   }, []);
 
+  const onExportPdf = useCallback(async () => {
+    if (!reactFlowWrapper.current) return;
+    const node = reactFlowWrapper.current.querySelector('.react-flow__viewport') as HTMLElement | null;
+    if (!node) return;
+    try {
+      const dataUrl = await htmlToImage.toPng(node, { pixelRatio: 2, cacheBust: true, backgroundColor: '#ffffff' });
+      const img = new Image();
+      img.onload = () => {
+        const pxWidth = img.width, pxHeight = img.height;
+        const landscape = pxWidth > pxHeight;
+        const doc = new jsPDF({ orientation: landscape ? 'landscape' : 'portrait', unit: 'mm', format: 'a4' });
+        const pageSize = doc.internal.pageSize;
+        const pageW = pageSize.getWidth();
+        const pageH = pageSize.getHeight();
+        const margin = 10; const availW = pageW - margin*2; const availH = pageH - margin*2;
+        const scale = Math.min(availW / pxWidth, availH / pxHeight);
+        const renderW = pxWidth * scale; const renderH = pxHeight * scale;
+        const offX = (pageW - renderW)/2; const offY = (pageH - renderH)/2;
+        doc.addImage(dataUrl, 'PNG', offX, offY, renderW, renderH);
+        doc.save(`architecture-${Date.now()}.pdf`);
+      };
+      img.src = dataUrl;
+    } catch (e) { console.error(e); }
+  }, []);
+
   // Export graph as JSON file (nodes + edges)
   const onExportJson = useCallback(() => {
     const payload = { nodes, edges };
@@ -945,6 +972,7 @@ function DiagramCanvas() {
             onSave={onSave}
             onLoad={onLoad}
             onExportPng={onExportPng}
+            onExportPdf={onExportPdf}
             onExportJson={onExportJson}
             onImportJson={onImportJson}
             onClear={onClear}
