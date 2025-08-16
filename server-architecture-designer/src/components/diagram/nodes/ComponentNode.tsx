@@ -198,10 +198,14 @@ const ComponentNode = memo(({ id, data, selected, isConnectable }: ComponentNode
             <div className="fw-badge dark:!bg-amber-400/90 dark:!text-slate-900 dark:!border-amber-500" title="Firewall activé" aria-label="firewall">🛡️</div>
         </div>
       )}
-  <div ref={widthMode==='auto'?autoRef:undefined} className={"group rounded-2xl shadow-lg px-2 py-1 hover:shadow-xl transition overflow-visible border relative dark:shadow-slate-950/40 " + (widthMode==='auto' ? ' inline-flex items-center' : '')}
+  { /* Service body */ }
+  {(() => {
+    const hasNetworks = Array.isArray(data?.networkColors) && data.networkColors.length > 0;
+    return (
+  <div ref={widthMode==='auto'?autoRef:undefined} className={"group rounded-2xl shadow-lg px-2 pt-1 pb-1 hover:shadow-xl transition overflow-visible border relative dark:shadow-slate-950/40 " + (widthMode==='auto' ? ' inline-flex items-center' : '')}
        style={{ borderColor, background: bg, width: widthMode==='auto' ? (autoW? `${autoW}px` : undefined) : serviceWidth }}>
-        {Array.isArray(data?.networkColors) && data.networkColors.length > 0 && (
-          <div className="absolute left-0 right-0 top-0 h-1.5 flex overflow-hidden rounded-t-2xl">
+        {hasNetworks && (
+          <div className="pointer-events-none absolute top-[1px] left-[1px] right-[1px] h-1.5 flex overflow-hidden rounded-t-[1rem]" style={{ mask: 'linear-gradient(#000,#000)', WebkitMask: 'linear-gradient(#000,#000)' }}>
             {data.networkColors.slice(0,8).map((c:string, i:number) => (<div key={i} className="flex-1" style={{ background: c }} />))}
             {data.networkColors.length > 8 && <div className="px-1 text-[9px] leading-none bg-slate-50/80 text-slate-700">+{data.networkColors.length-8}</div>}
           </div>
@@ -211,7 +215,7 @@ const ComponentNode = memo(({ id, data, selected, isConnectable }: ComponentNode
         <Handle type="source" position={Position.Bottom} className={`handle-lg !bg-gray-500/80 transition-opacity ${selected ? 'opacity-100' : 'opacity-0'}`} isConnectable={isConnectable} />
         <Handle type="target" position={Position.Left} className={`handle-lg !bg-gray-500/80 transition-opacity ${selected ? 'opacity-100' : 'opacity-0'}`} isConnectable={isConnectable} />
         <Handle type="source" position={Position.Right} className={`handle-lg !bg-gray-500/80 transition-opacity ${selected ? 'opacity-100' : 'opacity-0'}`} isConnectable={isConnectable} />
-        <div className="flex items-center gap-2 min-w-0">
+  <div className={"flex items-center gap-2 min-w-0 transition-all " + (hasNetworks ? 'mt-1' : '')}>
           {icon ? <img src={icon} alt="" className="h-7 w-7 object-contain rounded" /> : <div className="h-7 w-7 rounded bg-gray-200 dark:bg-slate-600" />}
           {showText && <div className={`font-medium text-sm truncate flex-1 ${labelColorClass} dark:text-slate-100`} title={label || 'Unnamed'}>{label || 'Unnamed'}</div>}
           <span className="inline-block h-2 w-2 rounded-full flex-shrink-0" style={{ background: borderColor }} />
@@ -236,7 +240,8 @@ const ComponentNode = memo(({ id, data, selected, isConnectable }: ComponentNode
             );
           })()
         )}
-      </div>
+    </div>
+      ); })()}
     </div>
   );
 });
