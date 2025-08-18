@@ -125,12 +125,26 @@ const NetworkLinkEdge = memo(({
 
   return (
     <g className={`react-flow__edge ${selected ? 'selected' : ''} network-link-edge`}>
+      {/* Invisible wider path for easier selection */}
+      <path
+        d={edgePath}
+        stroke="transparent"
+        strokeWidth={Math.max(20, (selected ? 4 : 3) * 4)} // Minimum 20px wide hit area
+        fill="none"
+        style={{ 
+          cursor: 'pointer',
+          pointerEvents: 'stroke' // Only the stroke area is clickable
+        }}
+      />
+      
+      {/* Visible path */}
       <path
         id={id}
         style={{
           ...style,
           stroke: networkColor,
           strokeWidth: selected ? 4 : 3,
+          pointerEvents: 'none' // Prevent double click events
         }}
         className="react-flow__edge-path"
         d={edgePath}
