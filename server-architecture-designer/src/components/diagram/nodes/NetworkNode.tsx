@@ -10,7 +10,7 @@ const NetworkNode = memo(({ id, data, selected, isConnectable }: NetworkNodeProp
   const { label = 'Network', color = '#10b981', textColor, width = 420, height = 240, headerPos = 'top' } = data || {};
   const text = textColor || '#0f172a';
   const bgTint = hexToRgba(color || '#10b981', 0.08);
-  const handleSize = 10;
+  const handleSize = 16;
   const showHandles = selected;
   const startResize = (e: React.MouseEvent, dir: string) => {
     e.preventDefault(); e.stopPropagation();
@@ -105,9 +105,9 @@ const NetworkNode = memo(({ id, data, selected, isConnectable }: NetworkNodeProp
   <div className="absolute inset-0 rounded-2xl overflow-hidden" style={{ background: bgTint }} />
         {showHandles && (
           <>
-            <div data-resize onMouseDownCapture={(e)=>startResize(e,'e')} className="absolute top-1/2 right-0 -translate-y-1/2 translate-x-1/2 cursor-ew-resize bg-blue-500/80 hover:bg-blue-500 rounded-full shadow z-10" style={{ width: handleSize, height: handleSize }} />
-            <div data-resize onMouseDownCapture={(e)=>startResize(e,'s')} className="absolute bottom-0 left-1/2 -translate-x-1/2 translate-y-1/2 cursor-ns-resize bg-blue-500/80 hover:bg-blue-500 rounded-full shadow z-10" style={{ width: handleSize, height: handleSize }} />
-            <div data-resize onMouseDownCapture={(e)=>startResize(e,'se')} className="absolute bottom-0 right-0 translate-x-1/3 translate-y-1/3 cursor-nwse-resize bg-blue-600 hover:bg-blue-500 rounded-md shadow z-10" style={{ width: handleSize+2, height: handleSize+2 }} />
+            <div data-resize onMouseDownCapture={(e)=>startResize(e,'e')} className="absolute top-1/2 right-0 -translate-y-1/2 translate-x-1/2 cursor-ew-resize bg-blue-500 hover:bg-blue-600 border-2 border-white hover:border-blue-200 rounded-full shadow-lg hover:shadow-xl transition-all duration-150 z-10" style={{ width: handleSize, height: handleSize }} />
+            <div data-resize onMouseDownCapture={(e)=>startResize(e,'s')} className="absolute bottom-0 left-1/2 -translate-x-1/2 translate-y-1/2 cursor-ns-resize bg-blue-500 hover:bg-blue-600 border-2 border-white hover:border-blue-200 rounded-full shadow-lg hover:shadow-xl transition-all duration-150 z-10" style={{ width: handleSize, height: handleSize }} />
+            <div data-resize onMouseDownCapture={(e)=>startResize(e,'se')} className="absolute bottom-0 right-0 translate-x-1/3 translate-y-1/3 cursor-nwse-resize bg-blue-600 hover:bg-blue-700 border-2 border-white hover:border-blue-200 rounded-md shadow-lg hover:shadow-xl transition-all duration-150 z-10" style={{ width: handleSize+2, height: handleSize+2 }} />
           </>
         )}
       </div>

@@ -436,13 +436,21 @@ function DiagramCanvas() {
         position:absolute; background-repeat:repeat; background-size: var(--fwtexSize, 16px 16px);
       }
       .firewall-ring .fw-badge {
-        position:absolute; top:-18px; left:-18px; height:40px; width:40px; border-radius:9999px;
-        display:flex; align-items:center; justify-content:center; font-size:18px; line-height:1;
-        background:#fff7ed; color:#111827; border:2px solid #0f172a;
-        box-shadow:0 3px 8px rgba(0,0,0,0.3);
-        pointer-events:none; backdrop-filter: blur(2px);
+        /* Enlarged & re-centered badge */
+        position:absolute; top:-18px; left:-18px; height:44px; width:44px; border-radius:16px;
+        display:flex; align-items:center; justify-content:center; line-height:1;
+        background:linear-gradient(135deg,#fffaf5,#ffe4cc); color:#92400e; border:2px solid #f59e0b;
+        box-shadow:0 6px 14px -3px rgba(0,0,0,0.28), 0 0 0 1px rgba(255,255,255,0.65) inset;
+        pointer-events:none; backdrop-filter: blur(5px) saturate(1.5);
+        font-weight:600; font-size:11px; letter-spacing:.5px;
+        isolation:isolate;
+        transition:filter .25s ease, transform .25s ease;
       }
-      .dark .firewall-ring .fw-badge { background:rgba(251,146,60,0.18); color:#fcd9b6; border:2px solid #f59e0b; box-shadow:0 0 0 1px rgba(255,255,255,0.04), 0 4px 10px -2px rgba(0,0,0,0.6); }
+  .firewall-ring .fw-badge svg { width:34px; height:34px; display:block; filter:drop-shadow(0 1.5px 2px rgba(0,0,0,0.32)); }
+      .firewall-ring .fw-badge::after { content:""; position:absolute; inset:2px; border-radius:11px; background:linear-gradient(180deg,rgba(255,255,255,0.55),rgba(255,255,255,0)); mix-blend-mode:overlay; pointer-events:none; }
+      .dark .firewall-ring .fw-badge { background:linear-gradient(135deg,#78350f,#b45309); color:#fde68a; border:2px solid #f59e0b; box-shadow:0 0 0 1px rgba(255,255,255,0.05), 0 4px 12px -2px rgba(0,0,0,0.7); }
+      .dark .firewall-ring .fw-badge::after { background:linear-gradient(180deg,rgba(255,255,255,0.25),rgba(255,255,255,0)); }
+      .firewall-ring .fw-badge:hover { filter:brightness(1.05); }
   /* Inner gap from element border + centered bricks within ring */
   .firewall-ring .fw-top { top: calc(var(--ringGapInner, 2px) * -1); left:0; right:0; height: var(--ringThickness, 8px); border-top-left-radius:1.35rem; border-top-right-radius:1.35rem; background-image: var(--fwtexH); background-position: var(--fwtexOffX, 0) calc(var(--fwShiftTopY, 0)); }
   .firewall-ring .fw-bottom { bottom: calc(var(--ringGapInner, 2px) * -1); left:0; right:0; height: var(--ringThickness, 8px); border-bottom-left-radius:1.35rem; border-bottom-right-radius:1.35rem; background-image: var(--fwtexH); background-position: var(--fwtexOffX, 0) calc(var(--fwShiftTopY, 0)); }

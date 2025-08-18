@@ -71,7 +71,7 @@ const ComponentNode = memo(({ id, data, selected, isConnectable }: ComponentNode
   const showText = zoom >= 0.6;
   // dynamic label color if auto background
   const labelColorClass = !isContainer && isAuto(bgColor) ? (isDark ? 'text-slate-100' : 'text-slate-800') : '';
-  const handleSize = 10;
+  const handleSize = 16;
   const showHandles = isContainer && selected && !locked;
 
   const startResize = (e: React.MouseEvent, dir: string) => {
@@ -107,7 +107,23 @@ const ComponentNode = memo(({ id, data, selected, isConnectable }: ComponentNode
             <div className="fw-bottom" />
             <div className="fw-left" />
             <div className="fw-right" />
-            <div className="fw-badge dark:!bg-amber-400/90 dark:!text-slate-900 dark:!border-amber-500" title="Firewall activé" aria-label="firewall">🛡️</div>
+            <div className="fw-badge" title="Firewall activé" aria-label="firewall">
+              <svg viewBox="0 0 32 32" role="img" aria-hidden="true">
+                <defs>
+                  <linearGradient id="fwShieldGradL" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stop-color="#fef3c7" />
+                    <stop offset="100%" stop-color="#f59e0b" />
+                  </linearGradient>
+                  <linearGradient id="fwShieldGradD" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stop-color="#78350f" />
+                    <stop offset="100%" stop-color="#92400e" />
+                  </linearGradient>
+                </defs>
+                <path fill="url(#fwShieldGradL)" stroke="#b45309" stroke-width="1.5" d="M16 3.5c-.4 0-.8.08-1.18.24l-7.4 3.1c-.57.24-.94.8-.94 1.42 0 9.3 5.2 14.9 9.3 17.45.73.46 1.61.46 2.34 0 3.54-2.2 8.4-7.55 8.4-17.45 0-.62-.37-1.18-.94-1.42l-7.4-3.1A3 3 0 0 0 16 3.5Z" />
+                <path fill="url(#fwShieldGradD)" d="M16 6.2c-.27 0-.54.06-.78.17l-5.4 2.3c-.32.13-.52.44-.52.78 0 6.9 4 11.2 6.7 13 .3.2.68.2.98 0 2.44-1.52 6.12-5.29 6.12-13 0-.34-.2-.65-.52-.79l-5.4-2.29c-.24-.11-.5-.17-.78-.17Z" opacity=".9" />
+                <path fill="#fff" fill-opacity="0.9" d="M15 10.25c0-.41.34-.75.75-.75s.75.34.75.75v5.7a.75.75 0 0 1-1.5 0v-5.7Zm.75 8.1c-.55 0-1 .44-1 1s.45 1 1 1c.56 0 1-.44 1-1s-.44-1-1-1Z" />
+              </svg>
+            </div>
           </div>
         )}
         <div className={`rounded-2xl overflow-hidden relative ${selected ? 'container-sel' : ''}`} style={{ width: '100%', height: '100%', border: `1px solid ${borderColor}`, background: bg, paddingTop: headerPos==='top'?CONTAINER_HEADER_HEIGHT:0, paddingLeft: headerPos==='left'?CONTAINER_HEADER_HEIGHT:0 }}>
@@ -143,9 +159,9 @@ const ComponentNode = memo(({ id, data, selected, isConnectable }: ComponentNode
           </div>)}
           {showHandles && (
             <>
-              <div data-resize onMouseDownCapture={(e)=>startResize(e,'e')} className="absolute top-1/2 right-0 -translate-y-1/2 translate-x-1/2 cursor-ew-resize bg-blue-500/80 hover:bg-blue-500 rounded-full shadow z-10" style={{ width: handleSize, height: handleSize }} />
-              <div data-resize onMouseDownCapture={(e)=>startResize(e,'s')} className="absolute bottom-0 left-1/2 -translate-x-1/2 translate-y-1/2 cursor-ns-resize bg-blue-500/80 hover:bg-blue-500 rounded-full shadow z-10" style={{ width: handleSize, height: handleSize }} />
-              <div data-resize onMouseDownCapture={(e)=>startResize(e,'se')} className="absolute bottom-0 right-0 translate-x-1/3 translate-y-1/3 cursor-nwse-resize bg-blue-600 hover:bg-blue-500 rounded-md shadow z-10" style={{ width: handleSize+2, height: handleSize+2 }} />
+              <div data-resize onMouseDownCapture={(e)=>startResize(e,'e')} className="absolute top-1/2 right-0 -translate-y-1/2 translate-x-1/2 cursor-ew-resize bg-blue-500 hover:bg-blue-600 border-2 border-white hover:border-blue-200 rounded-full shadow-lg hover:shadow-xl transition-all duration-150 z-10" style={{ width: handleSize, height: handleSize }} />
+              <div data-resize onMouseDownCapture={(e)=>startResize(e,'s')} className="absolute bottom-0 left-1/2 -translate-x-1/2 translate-y-1/2 cursor-ns-resize bg-blue-500 hover:bg-blue-600 border-2 border-white hover:border-blue-200 rounded-full shadow-lg hover:shadow-xl transition-all duration-150 z-10" style={{ width: handleSize, height: handleSize }} />
+              <div data-resize onMouseDownCapture={(e)=>startResize(e,'se')} className="absolute bottom-0 right-0 translate-x-1/3 translate-y-1/3 cursor-nwse-resize bg-blue-600 hover:bg-blue-700 border-2 border-white hover:border-blue-200 rounded-md shadow-lg hover:shadow-xl transition-all duration-150 z-10" style={{ width: handleSize+2, height: handleSize+2 }} />
             </>
           )}
         </div>
@@ -191,13 +207,29 @@ const ComponentNode = memo(({ id, data, selected, isConnectable }: ComponentNode
     <div className="relative inline-block" style={{ ['--fwtexH' as any]: features?.firewall ? `url('${tex.urlH}')` : undefined, ['--fwtexV' as any]: features?.firewall ? `url('${tex.urlV}')` : undefined, ['--fwtexSize' as any]: features?.firewall ? `${tex.size}px ${tex.size}px` : undefined, ['--fwtexOffX' as any]: `${tex.offX}px`, ['--fwtexOffY' as any]: `${tex.offY}px`, ['--fwShiftTopY' as any]: `${tex.shiftTopY}px`, ['--fwShiftSideX' as any]: `${tex.shiftSideX}px`, ['--ringGapInner' as any]: '5px', ['--ringThickness' as any]: '12px' }}>
         {features?.firewall && (
           <div className="firewall-ring rounded-2xl">
-          <div className="fw-top" />
-          <div className="fw-bottom" />
-          <div className="fw-left" />
-          <div className="fw-right" />
-            <div className="fw-badge dark:!bg-amber-400/90 dark:!text-slate-900 dark:!border-amber-500" title="Firewall activé" aria-label="firewall">🛡️</div>
-        </div>
-      )}
+            <div className="fw-top" />
+            <div className="fw-bottom" />
+            <div className="fw-left" />
+            <div className="fw-right" />
+            <div className="fw-badge" title="Firewall activé" aria-label="firewall">
+              <svg viewBox="0 0 32 32" role="img" aria-hidden="true">
+                <defs>
+                  <linearGradient id="fwShieldGradL2" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stop-color="#fef3c7" />
+                    <stop offset="100%" stop-color="#f59e0b" />
+                  </linearGradient>
+                  <linearGradient id="fwShieldGradD2" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stop-color="#78350f" />
+                    <stop offset="100%" stop-color="#92400e" />
+                  </linearGradient>
+                </defs>
+                <path fill="url(#fwShieldGradL2)" stroke="#b45309" stroke-width="1.5" d="M16 3.5c-.4 0-.8.08-1.18.24l-7.4 3.1c-.57.24-.94.8-.94 1.42 0 9.3 5.2 14.9 9.3 17.45.73.46 1.61.46 2.34 0 3.54-2.2 8.4-7.55 8.4-17.45 0-.62-.37-1.18-.94-1.42l-7.4-3.1A3 3 0 0 0 16 3.5Z" />
+                <path fill="url(#fwShieldGradD2)" d="M16 6.2c-.27 0-.54.06-.78.17l-5.4 2.3c-.32.13-.52.44-.52.78 0 6.9 4 11.2 6.7 13 .3.2.68.2.98 0 2.44-1.52 6.12-5.29 6.12-13 0-.34-.2-.65-.52-.79l-5.4-2.29c-.24-.11-.5-.17-.78-.17Z" opacity=".9" />
+                <path fill="#fff" fill-opacity="0.9" d="M15 10.25c0-.41.34-.75.75-.75s.75.34.75.75v5.7a.75.75 0 0 1-1.5 0v-5.7Zm.75 8.1c-.55 0-1 .44-1 1s.45 1 1 1c.56 0 1-.44 1-1s-.44-1-1-1Z" />
+              </svg>
+            </div>
+          </div>
+        )}
   { /* Service body */ }
   {(() => {
     const hasNetworks = Array.isArray(data?.networkColors) && data.networkColors.length > 0;
