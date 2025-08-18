@@ -23,10 +23,11 @@ import ReactFlow, {
   useStore,
   useReactFlow,
   ConnectionMode,
+  ConnectionLineType,
 } from "reactflow";
 import "reactflow/dist/style.css";
 import { Button } from "@/components/ui/button";
-import { Toolbar, PropertiesPanel, PalettePanel, ComponentNode, DoorNode, NetworkNode, MODES, GRID_SIZE, CONTAINER_HEADER_HEIGHT, NETWORK_HEADER_HEIGHT, DEFAULT_DOOR_WIDTH, DEFAULT_DOOR_HEIGHT, HISTORY_STORAGE_KEY, SNAP_STORAGE_KEY, hexToRgba, autoTextColor, isAncestor } from './diagram';
+import { Toolbar, PropertiesPanel, PalettePanel, ComponentNode, DoorNode, NetworkNode, NetworkLinkEdge, CustomEdge, MODES, GRID_SIZE, CONTAINER_HEADER_HEIGHT, NETWORK_HEADER_HEIGHT, DEFAULT_DOOR_WIDTH, DEFAULT_DOOR_HEIGHT, HISTORY_STORAGE_KEY, SNAP_STORAGE_KEY, hexToRgba, autoTextColor, isAncestor, updateNetworkLinksForService, isNetworkLink } from './diagram';
 import { ThemeProvider } from './theme/ThemeProvider';
 import { useDiagramHistory } from './diagram/hooks/useDiagramHistory';
 import { useDiagramSelection } from './diagram/hooks/useDiagramSelection';
@@ -239,6 +240,13 @@ function snapDoorToNearestSide(parent: any, localPos: {x:number;y:number}, doorW
 
 // == Node Types Registry =====================================================
 const nodeTypes = { component: ComponentNode, door: DoorNode, network: NetworkNode } as const;
+const edgeTypes = { 
+  networkLink: NetworkLinkEdge,
+  default: CustomEdge,
+  straight: CustomEdge,
+  step: CustomEdge,
+  smoothstep: CustomEdge
+} as const;
 // == End Node Types Registry =================================================
 
 // =============================
@@ -288,9 +296,10 @@ function DiagramCanvas() {
   const initialNodes = useMemo(
     () => [
       { id: "traefik-1", type: "component", position: { x: 200, y: 40 }, data: { label: "Traefik", icon: CATALOG.find(c => c.id === "traefik")!.icon, color: CATALOG.find(c => c.id === "traefik")!.color, features: { auth1: true }, isContainer: false } },
-      { id: "nextcloud-1", type: "component", position: { x: 80, y: 240 }, data: { label: "Nextcloud", icon: CATALOG.find(c => c.id === "nextcloud")!.icon, color: CATALOG.find(c => c.id === "nextcloud")!.color, features: { auth2: true }, isContainer: false } },
+      { id: "nextcloud-1", type: "component", position: { x: 80, y: 240 }, data: { label: "Nextcloud", icon: CATALOG.find(c => c.id === "nextcloud")!.icon, color: CATALOG.find(c => c.id === "nextcloud")!.color, features: { auth2: true }, isContainer: false, networks: ["net-test-1"] } },
       { id: "ha-1", type: "component", position: { x: 360, y: 240 }, data: { label: "Home Assistant", icon: CATALOG.find(c => c.id === "homeassistant")!.icon, color: CATALOG.find(c => c.id === "homeassistant")!.color, features: { hourglass: true }, isContainer: false } },
       { id: "group-1", type: "component", position: { x: 580, y: 60 }, data: { label: "Home Lab Rack", color: "#475569", width: 520, height: 320, locked: false, isContainer: true, bgColor: '#ffffff', bgOpacity: 0.85 }, style: { width: 520, height: 320 } },
+      { id: "net-test-1", type: "network", position: { x: 100, y: 350 }, data: { netId: "net-test-1", label: "Test Network", color: "#10b981", width: 300, height: 180 } },
     ],
     []
   );
@@ -342,6 +351,32 @@ function DiagramCanvas() {
     const same = present.length === networks.length && present.every((p, i) => p.id === networks[i]?.id && p.label === networks[i]?.label && p.color === networks[i]?.color);
     if (!same) setNetworks(present);
   }, [nodes]);
+
+  // Synchronize network links when networks or nodes change
+  useEffect(() => {
+    const networkColorMap = new Map(networks.map(n => [n.id, n.color]));
+    
+    setEdges((eds) => {
+      let updatedEdges = eds;
+      
+      // Update all services with autoLinkToNetworks enabled
+      nodes.forEach(node => {
+        if (node.type === 'component' && !node.data?.isContainer && node.data?.autoLinkToNetworks) {
+          const networkIds = Array.isArray(node.data?.networks) ? node.data.networks : [];
+          updatedEdges = updateNetworkLinksForService(updatedEdges, nodes, node.id, networkIds, networkColorMap, true);
+        }
+      });
+      
+      // Remove network links that point to non-existent networks
+      const existingNodeIds = new Set(nodes.map(n => n.id));
+      updatedEdges = updatedEdges.filter(edge => {
+        if (!isNetworkLink(edge)) return true;
+        return existingNodeIds.has(edge.source) && existingNodeIds.has(edge.target);
+      });
+      
+      return updatedEdges;
+    });
+  }, [networks, nodes]);
   // Track changes
   useEffect(()=>{ commitIfChanged(nodes, edges); }, [nodes, edges, commitIfChanged]);
   useEffect(()=>{ const handler=(e:KeyboardEvent)=>{ if((e.ctrlKey||e.metaKey)&&!e.shiftKey&&e.key.toLowerCase()==='z'){ e.preventDefault(); undo(); } else if((e.ctrlKey||e.metaKey)&&(e.key.toLowerCase()==='y'||(e.shiftKey&&e.key.toLowerCase()==='z'))){ e.preventDefault(); redo(); } }; window.addEventListener('keydown', handler); return ()=> window.removeEventListener('keydown', handler); },[undo,redo]);
@@ -416,18 +451,81 @@ function DiagramCanvas() {
   /* Larger handles for easier connecting */
   .react-flow__handle.handle-lg { width: 16px; height: 16px; border: 2px solid #ffffff; box-shadow: 0 0 0 3px rgba(59,130,246,0.35); }
   .react-flow__handle.handle-lg:hover { box-shadow: 0 0 0 4px rgba(59,130,246,0.55); }
+  
+  /* Network link edge styling */
+  .react-flow__edge.network-link-edge path { 
+    stroke-width: 3px;
+    filter: drop-shadow(0 2px 4px rgba(0,0,0,0.1));
+  }
+  .react-flow__edge.network-link-edge.selected path { 
+    stroke-width: 4px;
+    filter: drop-shadow(0 4px 8px rgba(0,0,0,0.15));
+  }
+  .react-flow__edge.network-link-edge .react-flow__edge-text { 
+    font-size: 11px; 
+    font-weight: 600; 
+    filter: drop-shadow(0 1px 2px rgba(255,255,255,0.8)); 
+  }
+  
+  /* Custom edge anchor handles */
+  .custom-edge .anchor-handle {
+    cursor: grab;
+    transition: all 0.2s ease;
+  }
+  .custom-edge .anchor-handle:hover {
+    transform: scale(1.1);
+  }
+  .custom-edge .anchor-handle.dragging {
+    cursor: grabbing;
+    transform: scale(1.2);
+  }
     `}</style>
   );
 
   // Stable edge addition + auto color + pattern baseline
   const addDefaultEdge = useCallback((params: any) => {
     setEdges((eds) => {
-      const data = { shape: 'smooth', pattern: 'solid' };
-      let e: any = { ...params, type: 'smoothstep', data, markerEnd: { type: MarkerType.ArrowClosed }, style: { strokeWidth: 2, stroke: '#64748b' } };
-      e = applyPatternToEdge(e);
-      return addEdge(e, eds);
+      // Check if this is a connection to a network node
+      const targetNode = nodes.find(n => n.id === params.target);
+      const sourceNode = nodes.find(n => n.id === params.source);
+      
+      if (targetNode?.type === 'network' && sourceNode?.type === 'component' && !sourceNode.data?.isContainer) {
+        // Create a network link edge
+        const networkColor = targetNode.data?.color || '#10b981';
+        const networkId = targetNode.data?.netId || targetNode.id;
+        
+        const e: any = {
+          ...params,
+          type: 'networkLink',
+          animated: false,
+          style: {
+            stroke: networkColor,
+            strokeWidth: 3,
+          },
+          markerEnd: {
+            type: MarkerType.ArrowClosed,
+            color: networkColor,
+          },
+          data: {
+            isNetworkLink: true,
+            networkId,
+            networkColor,
+            shape: 'smooth',
+            pattern: 'solid',
+          },
+          className: 'network-link-edge',
+        };
+        
+        return addEdge(e, eds);
+      } else {
+        // Create a regular edge with custom anchoring support
+        const data = { shape: 'smooth', pattern: 'solid' };
+        let e: any = { ...params, type: 'default', data, markerEnd: { type: MarkerType.ArrowClosed }, style: { strokeWidth: 2, stroke: '#64748b' } };
+        e = applyPatternToEdge(e);
+        return addEdge(e, eds);
+      }
     });
-  }, [setEdges, applyPatternToEdge]);
+  }, [setEdges, applyPatternToEdge, nodes]);
 
   const onConnect = useCallback((params: any) => addDefaultEdge(params), [addDefaultEdge]);
 
@@ -691,6 +789,18 @@ function DiagramCanvas() {
       // apply patch
       setNodes((nds) => nds.map((n) => (n.id === selection.id ? { ...n, ...patch, data: { ...n.data, ...(patch.data || {}) }, draggable: patch?.data?.locked !== undefined ? !patch.data.locked : n.draggable } : n)));
       setSelection((s: any) => ({ ...s, ...patch, data: { ...s.data, ...(patch.data || {}) } }));
+      
+      // Handle network links when autoLinkToNetworks or networks change
+      if (patch.data && (patch.data.hasOwnProperty('autoLinkToNetworks') || patch.data.hasOwnProperty('networks'))) {
+        const updatedNode = nodes.find(n => n.id === selection.id);
+        if (updatedNode && updatedNode.type === 'component' && !updatedNode.data?.isContainer) {
+          const networkIds = Array.isArray(patch.data.networks) ? patch.data.networks : (updatedNode.data?.networks || []);
+          const autoLinkEnabled = patch.data.hasOwnProperty('autoLinkToNetworks') ? patch.data.autoLinkToNetworks : (updatedNode.data?.autoLinkToNetworks || false);
+          const networkColorMap = new Map(networks.map(n => [n.id, n.color]));
+          
+          setEdges((eds) => updateNetworkLinksForService(eds, nodes, selection.id, networkIds, networkColorMap, autoLinkEnabled));
+        }
+      }
       // optional: resnap door immediately when offsets change
       if (patch?.resnapDoor) {
         setNodes((nds) => nds.map((n) => {
@@ -1018,6 +1128,7 @@ function DiagramCanvas() {
                     onDrop={onDrop as any}
                     onDragOver={onDragOver as any}
                     nodeTypes={nodeTypes as any}
+                    edgeTypes={edgeTypes as any}
                     onNodeClick={onNodeClick}
                     onEdgeClick={onEdgeClick}
                     onNodeDoubleClick={onNodeDoubleClick}
@@ -1026,10 +1137,17 @@ function DiagramCanvas() {
                     onNodeDragStart={(e,n)=>{ onNodeDragStart(e,n); onNodeDragStartMulti(e,n); }}
                     onNodeDrag={onNodeDrag}
                     connectionMode={ConnectionMode.Loose}
+                    connectionLineType={ConnectionLineType.Straight}
+                    defaultEdgeOptions={{
+                      type: 'default',
+                      style: { strokeWidth: 2, stroke: '#64748b' },
+                      markerEnd: { type: MarkerType.ArrowClosed }
+                    }}
                     snapToGrid={snapEnabled}
                     snapGrid={[GRID, GRID]}
                     elementsSelectable
                     selectNodesOnDrag
+                    nodesConnectable
                     fitView
                   >
                     <MiniMap pannable zoomable className="!rounded-xl !bg-white/80 dark:!bg-slate-800/65 !backdrop-blur !border border-slate-200/60 dark:!border-slate-600/60" nodeStrokeWidth={1} nodeColor={miniMapNodeColorFn} />

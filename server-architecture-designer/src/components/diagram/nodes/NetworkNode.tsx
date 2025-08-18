@@ -1,11 +1,12 @@
 "use client";
 import React, { memo } from 'react';
+import { Handle, Position } from 'reactflow';
 import { CONTAINER_HEADER_HEIGHT, NETWORK_HEADER_HEIGHT } from '../constants';
 import { hexToRgba } from '../diagram-helpers';
 
-interface NetworkNodeProps { id: string; data: any; selected: boolean; }
+interface NetworkNodeProps { id: string; data: any; selected: boolean; isConnectable: boolean; }
 
-const NetworkNode = memo(({ id, data, selected }: NetworkNodeProps) => {
+const NetworkNode = memo(({ id, data, selected, isConnectable }: NetworkNodeProps) => {
   const { label = 'Network', color = '#10b981', textColor, width = 420, height = 240, headerPos = 'top' } = data || {};
   const text = textColor || '#0f172a';
   const bgTint = hexToRgba(color || '#10b981', 0.08);
@@ -35,6 +36,36 @@ const NetworkNode = memo(({ id, data, selected }: NetworkNodeProps) => {
     <div className="relative" style={{ width, height }}>
       {selected && <div className="absolute inset-0 -m-1 rounded-2xl ring-2 ring-blue-500 pointer-events-none" />}
   <div className="rounded-2xl relative border shadow-sm overflow-visible" style={{ borderColor: color, width: '100%', height: '100%' }}>
+        {/* Connection handles for network links - always present for React Flow but visually hidden when not selected */}
+        <Handle 
+          type="target" 
+          position={Position.Top} 
+          className={`handle-lg !bg-gray-500/80 transition-opacity duration-200 ${selected ? 'opacity-100' : 'opacity-0'}`} 
+          isConnectable={true}
+          style={{ pointerEvents: selected ? 'auto' : 'none' }}
+        />
+        <Handle 
+          type="source" 
+          position={Position.Bottom} 
+          className={`handle-lg !bg-gray-500/80 transition-opacity duration-200 ${selected ? 'opacity-100' : 'opacity-0'}`} 
+          isConnectable={true}
+          style={{ pointerEvents: selected ? 'auto' : 'none' }}
+        />
+        <Handle 
+          type="target" 
+          position={Position.Left} 
+          className={`handle-lg !bg-gray-500/80 transition-opacity duration-200 ${selected ? 'opacity-100' : 'opacity-0'}`} 
+          isConnectable={true}
+          style={{ pointerEvents: selected ? 'auto' : 'none' }}
+        />
+        <Handle 
+          type="source" 
+          position={Position.Right} 
+          className={`handle-lg !bg-gray-500/80 transition-opacity duration-200 ${selected ? 'opacity-100' : 'opacity-0'}`} 
+          isConnectable={true}
+          style={{ pointerEvents: selected ? 'auto' : 'none' }}
+        />
+        
         {headerPos==='top' && (
         <div className="absolute top-0 left-1/2 -translate-x-1/2 z-[2] -translate-y-1/2">
           <div className="relative px-3 py-1.5 rounded-full border shadow flex items-center gap-2" style={{ background: color, color: text, borderColor: color }}>

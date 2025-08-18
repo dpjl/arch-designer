@@ -239,6 +239,18 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({ selection, onC
               <div className="space-y-2">
                 <SectionTitle>Réseaux</SectionTitle>
                 <NetworksInlineEditor selection={selection} onChange={onChange} networks={networks} />
+                <div className="flex items-center gap-2 pt-1">
+                  <Checkbox
+                    checked={!!selection.data?.autoLinkToNetworks}
+                    onCheckedChange={(v) => onChange({ data: { ...selection.data, autoLinkToNetworks: !!v } })}
+                  />
+                  <span className="text-xs">Lier automatiquement aux réseaux</span>
+                </div>
+                {selection.data?.autoLinkToNetworks && (
+                  <div className="text-[11px] text-slate-500 dark:text-slate-400 bg-blue-50 dark:bg-blue-900/30 p-2 rounded">
+                    Des liens automatiques seront créés vers tous les réseaux sélectionnés. La couleur de chaque lien correspondra à celle du réseau ciblé.
+                  </div>
+                )}
               </div>
             )}
             {isDoor && (
@@ -338,6 +350,196 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({ selection, onC
             <div className="space-y-1">
               <SectionTitle>Label</SectionTitle>
               <Input value={selection.label || ''} onChange={(e)=> onChange({ label: e.target.value })} />
+            </div>
+            
+            {/* Network link information */}
+            {selection.data?.isNetworkLink && (
+              <div className="space-y-1">
+                <div className="text-sm text-slate-600 dark:text-slate-300 bg-blue-50 dark:bg-blue-900/30 p-2 rounded">
+                  🔗 Lien automatique vers le réseau <strong>{selection.data.networkId}</strong>
+                </div>
+              </div>
+            )}
+            
+            {/* Anchor positioning information */}
+            <div className="space-y-1">
+              <SectionTitle>Positionnement des extrémités</SectionTitle>
+              
+              {/* Quick presets */}
+              <div className="space-y-2">
+                <div className="text-sm font-medium text-slate-700 dark:text-slate-300">Presets rapides</div>
+                <div className="grid grid-cols-2 gap-1 text-xs">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-7 text-xs"
+                    onClick={() => onChange({ 
+                      data: { 
+                        ...selection.data, 
+                        sourceAnchor: { nodeId: selection.source, side: 'right', offset: 0.5 },
+                        targetAnchor: { nodeId: selection.target, side: 'left', offset: 0.5 }
+                      } 
+                    })}
+                  >
+                    ➡️ Horizontal
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-7 text-xs"
+                    onClick={() => onChange({ 
+                      data: { 
+                        ...selection.data, 
+                        sourceAnchor: { nodeId: selection.source, side: 'bottom', offset: 0.5 },
+                        targetAnchor: { nodeId: selection.target, side: 'top', offset: 0.5 }
+                      } 
+                    })}
+                  >
+                    ⬇️ Vertical
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-7 text-xs"
+                    onClick={() => onChange({ 
+                      data: { 
+                        ...selection.data, 
+                        sourceAnchor: { nodeId: selection.source, side: 'bottom', offset: 0.2 },
+                        targetAnchor: { nodeId: selection.target, side: 'top', offset: 0.8 }
+                      } 
+                    })}
+                  >
+                    ↗️ Diagonal
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-7 text-xs"
+                    onClick={() => onChange({ 
+                      data: { 
+                        ...selection.data, 
+                        sourceAnchor: undefined,
+                        targetAnchor: undefined
+                      } 
+                    })}
+                  >
+                    🔄 Auto
+                  </Button>
+                </div>
+              </div>
+              
+              {/* Source anchor controls */}
+              <div className="space-y-2">
+                <div className="text-sm font-medium text-slate-700 dark:text-slate-300">Source (départ)</div>
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="space-y-1">
+                    <Label className="text-xs">Côté</Label>
+                    <select 
+                      value={selection.data?.sourceAnchor?.side || 'right'}
+                      onChange={(e) => onChange({ 
+                        data: { 
+                          ...selection.data, 
+                          sourceAnchor: { 
+                            nodeId: selection.source, 
+                            side: e.target.value as any, 
+                            offset: selection.data?.sourceAnchor?.offset || 0.5 
+                          } 
+                        } 
+                      })}
+                      className="w-full p-1 text-xs border rounded dark:bg-slate-700 dark:border-slate-600"
+                    >
+                      <option value="top">Haut</option>
+                      <option value="right">Droite</option>
+                      <option value="bottom">Bas</option>
+                      <option value="left">Gauche</option>
+                    </select>
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">Position ({Math.round((selection.data?.sourceAnchor?.offset || 0.5) * 100)}%)</Label>
+                    <input
+                      type="range"
+                      min="0"
+                      max="1"
+                      step="0.01"
+                      value={selection.data?.sourceAnchor?.offset || 0.5}
+                      onChange={(e) => onChange({ 
+                        data: { 
+                          ...selection.data, 
+                          sourceAnchor: { 
+                            nodeId: selection.source, 
+                            side: selection.data?.sourceAnchor?.side || 'right', 
+                            offset: parseFloat(e.target.value) 
+                          } 
+                        } 
+                      })}
+                      className="w-full"
+                    />
+                  </div>
+                </div>
+              </div>
+              
+              {/* Target anchor controls */}
+              <div className="space-y-2">
+                <div className="text-sm font-medium text-slate-700 dark:text-slate-300">Cible (arrivée)</div>
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="space-y-1">
+                    <Label className="text-xs">Côté</Label>
+                    <select 
+                      value={selection.data?.targetAnchor?.side || 'left'}
+                      onChange={(e) => onChange({ 
+                        data: { 
+                          ...selection.data, 
+                          targetAnchor: { 
+                            nodeId: selection.target, 
+                            side: e.target.value as any, 
+                            offset: selection.data?.targetAnchor?.offset || 0.5 
+                          } 
+                        } 
+                      })}
+                      className="w-full p-1 text-xs border rounded dark:bg-slate-700 dark:border-slate-600"
+                    >
+                      <option value="top">Haut</option>
+                      <option value="right">Droite</option>
+                      <option value="bottom">Bas</option>
+                      <option value="left">Gauche</option>
+                    </select>
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">Position ({Math.round((selection.data?.targetAnchor?.offset || 0.5) * 100)}%)</Label>
+                    <input
+                      type="range"
+                      min="0"
+                      max="1"
+                      step="0.01"
+                      value={selection.data?.targetAnchor?.offset || 0.5}
+                      onChange={(e) => onChange({ 
+                        data: { 
+                          ...selection.data, 
+                          targetAnchor: { 
+                            nodeId: selection.target, 
+                            side: selection.data?.targetAnchor?.side || 'left', 
+                            offset: parseFloat(e.target.value) 
+                          } 
+                        } 
+                      })}
+                      className="w-full"
+                    />
+                  </div>
+                </div>
+              </div>
+              
+              {/* Current status */}
+              <div className="text-xs text-slate-500 dark:text-slate-400">
+                {(selection.data?.sourceAnchor || selection.data?.targetAnchor) ? (
+                  <div className="bg-green-50 dark:bg-green-900/30 p-2 rounded">
+                    ✓ Positions personnalisées actives
+                  </div>
+                ) : (
+                  <div className="bg-slate-50 dark:bg-slate-800 p-2 rounded">
+                    ℹ️ Positions automatiques (par défaut)
+                  </div>
+                )}
+              </div>
             </div>
             <div className="space-y-1">
               <SectionTitle>Forme</SectionTitle>
