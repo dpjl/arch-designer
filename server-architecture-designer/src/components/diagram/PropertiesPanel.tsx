@@ -9,6 +9,17 @@ import { Trash2 } from 'lucide-react';
 import { CATALOG } from '@/lib/catalog';
 import { autoTextColor } from '@/lib/utils';
 import { isAuto } from './color-utils';
+import { AutoLayoutControls } from './AutoLayoutControls';
+import { AutoLayoutConfig } from '@/types/diagram';
+
+const DEFAULT_AUTO_LAYOUT: AutoLayoutConfig = {
+  enabled: false,
+  leftMargin: 16,
+  topMargin: 16,
+  itemSpacing: 12,
+  lineSpacing: 8,
+  useGlobalDefaults: false // Par défaut false, peut être changé par l'utilisateur
+};
 
 export interface PropertiesPanelProps {
   selection: any;
@@ -18,6 +29,7 @@ export interface PropertiesPanelProps {
   multiCount?: number;
   onDeleteSelected: () => void;
   networks: any[];
+  globalAutoLayoutConfig: AutoLayoutConfig; // Ajout
 }
 
 const SectionTitle: React.FC<React.PropsWithChildren> = ({ children }) => (
@@ -43,7 +55,16 @@ function NetworksInlineEditor({ selection, onChange, networks }: any) {
 
 const DEFAULT_DOOR_WIDTH = 140;
 
-export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({ selection, onChange, onDelete, onClosePanel, multiCount, onDeleteSelected, networks }) => {
+export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({ 
+  selection, 
+  onChange, 
+  onDelete, 
+  onClosePanel, 
+  multiCount, 
+  onDeleteSelected, 
+  networks,
+  globalAutoLayoutConfig 
+}) => {
   if ((multiCount || 0) > 1) {
     return (
   <Card className="rounded-2xl text-[13px] bg-white/80 dark:bg-slate-800/80 backdrop-blur border border-slate-200 dark:border-slate-600 dark:shadow-[0_0_0_1px_rgba(255,255,255,0.05)]">
@@ -121,6 +142,22 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({ selection, onC
                 <div>
                   <Button variant="outline" size="sm" className="w-full" onClick={() => onChange({ autoFitNetwork: true })}>Ajuster à ses éléments</Button>
                 </div>
+                
+                {/* Auto-layout section for networks */}
+                <AutoLayoutControls
+                  config={selection.data.autoLayout || DEFAULT_AUTO_LAYOUT}
+                  globalConfig={globalAutoLayoutConfig}
+                  onChange={(config) => {
+                    // Mise à jour unique avec les nouvelles données ET déclenchement auto-layout
+                    onChange({ 
+                      data: { 
+                        ...selection.data, 
+                        autoLayout: config
+                      },
+                      ...(config.enabled ? { applyAutoLayout: true } : {})
+                    });
+                  }}
+                />
               </div>
             )}
             {!isDoor && !isNetwork && (
@@ -310,6 +347,22 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({ selection, onC
                   <Checkbox checked={!!selection.data.locked} onCheckedChange={(v) => onChange({ data: { ...selection.data, locked: !!v } })} />
                   <span className="text-xs">Verrouiller le container</span>
                 </div>
+
+                {/* Auto-layout section */}
+                <AutoLayoutControls
+                  config={selection.data.autoLayout || DEFAULT_AUTO_LAYOUT}
+                  globalConfig={globalAutoLayoutConfig}
+                  onChange={(config) => {
+                    // Mise à jour unique avec les nouvelles données ET déclenchement auto-layout
+                    onChange({ 
+                      data: { 
+                        ...selection.data, 
+                        autoLayout: config
+                      },
+                      ...(config.enabled ? { applyAutoLayout: true } : {})
+                    });
+                  }}
+                />
               </div>
             )}
             {!isDoor && isNode && (

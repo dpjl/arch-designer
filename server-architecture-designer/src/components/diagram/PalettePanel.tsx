@@ -1,9 +1,11 @@
 "use client";
 import React, { useState, useMemo } from 'react';
+import { AutoLayoutConfig } from '@/types/diagram';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 import { Input } from '@/components/ui/input';
 import { CATALOG } from '@/lib/catalog';
+import { GlobalAutoLayoutPanel } from './GlobalAutoLayoutPanel';
 
 interface PaletteItemProps { entry: any; onDragStart: (e: React.DragEvent, entry: any)=>void; }
 const PaletteItem: React.FC<PaletteItemProps> = ({ entry, onDragStart }) => (
@@ -30,9 +32,17 @@ export interface PalettePanelProps {
   visible: boolean;
   onClose: () => void;
   onEntryDragStart: (e: React.DragEvent, entry: any) => void;
+  globalAutoLayoutConfig: AutoLayoutConfig;
+  onUpdateGlobalAutoLayoutConfig: (config: AutoLayoutConfig) => void;
 }
 
-export const PalettePanel: React.FC<PalettePanelProps> = ({ visible, onClose, onEntryDragStart }) => {
+export const PalettePanel: React.FC<PalettePanelProps> = ({ 
+  visible, 
+  onClose, 
+  onEntryDragStart,
+  globalAutoLayoutConfig,
+  onUpdateGlobalAutoLayoutConfig 
+}) => {
   const [searchTerm, setSearchTerm] = useState('');
 
   // Filtrage intelligent avec useMemo pour les performances
@@ -126,6 +136,11 @@ export const PalettePanel: React.FC<PalettePanelProps> = ({ visible, onClose, on
           ))
         )}
       </CardContent>
+      
+      <GlobalAutoLayoutPanel 
+        globalConfig={globalAutoLayoutConfig}
+        onUpdateGlobalConfig={onUpdateGlobalAutoLayoutConfig}
+      />
     </Card>
   );
 };

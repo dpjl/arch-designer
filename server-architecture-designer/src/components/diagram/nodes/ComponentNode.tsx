@@ -111,17 +111,17 @@ const ComponentNode = memo(({ id, data, selected, isConnectable }: ComponentNode
               <svg viewBox="0 0 32 32" role="img" aria-hidden="true">
                 <defs>
                   <linearGradient id="fwShieldGradL" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stop-color="#fef3c7" />
-                    <stop offset="100%" stop-color="#f59e0b" />
+                    <stop offset="0%" stopColor="#fef3c7" />
+                    <stop offset="100%" stopColor="#f59e0b" />
                   </linearGradient>
                   <linearGradient id="fwShieldGradD" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stop-color="#78350f" />
-                    <stop offset="100%" stop-color="#92400e" />
+                    <stop offset="0%" stopColor="#78350f" />
+                    <stop offset="100%" stopColor="#92400e" />
                   </linearGradient>
                 </defs>
-                <path fill="url(#fwShieldGradL)" stroke="#b45309" stroke-width="1.5" d="M16 3.5c-.4 0-.8.08-1.18.24l-7.4 3.1c-.57.24-.94.8-.94 1.42 0 9.3 5.2 14.9 9.3 17.45.73.46 1.61.46 2.34 0 3.54-2.2 8.4-7.55 8.4-17.45 0-.62-.37-1.18-.94-1.42l-7.4-3.1A3 3 0 0 0 16 3.5Z" />
+                <path fill="url(#fwShieldGradL)" stroke="#b45309" strokeWidth="1.5" d="M16 3.5c-.4 0-.8.08-1.18.24l-7.4 3.1c-.57.24-.94.8-.94 1.42 0 9.3 5.2 14.9 9.3 17.45.73.46 1.61.46 2.34 0 3.54-2.2 8.4-7.55 8.4-17.45 0-.62-.37-1.18-.94-1.42l-7.4-3.1A3 3 0 0 0 16 3.5Z" />
                 <path fill="url(#fwShieldGradD)" d="M16 6.2c-.27 0-.54.06-.78.17l-5.4 2.3c-.32.13-.52.44-.52.78 0 6.9 4 11.2 6.7 13 .3.2.68.2.98 0 2.44-1.52 6.12-5.29 6.12-13 0-.34-.2-.65-.52-.79l-5.4-2.29c-.24-.11-.5-.17-.78-.17Z" opacity=".9" />
-                <path fill="#fff" fill-opacity="0.9" d="M15 10.25c0-.41.34-.75.75-.75s.75.34.75.75v5.7a.75.75 0 0 1-1.5 0v-5.7Zm.75 8.1c-.55 0-1 .44-1 1s.45 1 1 1c.56 0 1-.44 1-1s-.44-1-1-1Z" />
+                <path fill="#fff" fillOpacity="0.9" d="M15 10.25c0-.41.34-.75.75-.75s.75.34.75.75v5.7a.75.75 0 0 1-1.5 0v-5.7Zm.75 8.1c-.55 0-1 .44-1 1s.45 1 1 1c.56 0 1-.44 1-1s-.44-1-1-1Z" />
               </svg>
             </div>
           </div>
@@ -215,17 +215,17 @@ const ComponentNode = memo(({ id, data, selected, isConnectable }: ComponentNode
               <svg viewBox="0 0 32 32" role="img" aria-hidden="true">
                 <defs>
                   <linearGradient id="fwShieldGradL2" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stop-color="#fef3c7" />
-                    <stop offset="100%" stop-color="#f59e0b" />
+                    <stop offset="0%" stopColor="#fef3c7" />
+                    <stop offset="100%" stopColor="#f59e0b" />
                   </linearGradient>
                   <linearGradient id="fwShieldGradD2" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stop-color="#78350f" />
-                    <stop offset="100%" stop-color="#92400e" />
+                    <stop offset="0%" stopColor="#78350f" />
+                    <stop offset="100%" stopColor="#92400e" />
                   </linearGradient>
                 </defs>
-                <path fill="url(#fwShieldGradL2)" stroke="#b45309" stroke-width="1.5" d="M16 3.5c-.4 0-.8.08-1.18.24l-7.4 3.1c-.57.24-.94.8-.94 1.42 0 9.3 5.2 14.9 9.3 17.45.73.46 1.61.46 2.34 0 3.54-2.2 8.4-7.55 8.4-17.45 0-.62-.37-1.18-.94-1.42l-7.4-3.1A3 3 0 0 0 16 3.5Z" />
+                <path fill="url(#fwShieldGradL2)" stroke="#b45309" strokeWidth="1.5" d="M16 3.5c-.4 0-.8.08-1.18.24l-7.4 3.1c-.57.24-.94.8-.94 1.42 0 9.3 5.2 14.9 9.3 17.45.73.46 1.61.46 2.34 0 3.54-2.2 8.4-7.55 8.4-17.45 0-.62-.37-1.18-.94-1.42l-7.4-3.1A3 3 0 0 0 16 3.5Z" />
                 <path fill="url(#fwShieldGradD2)" d="M16 6.2c-.27 0-.54.06-.78.17l-5.4 2.3c-.32.13-.52.44-.52.78 0 6.9 4 11.2 6.7 13 .3.2.68.2.98 0 2.44-1.52 6.12-5.29 6.12-13 0-.34-.2-.65-.52-.79l-5.4-2.29c-.24-.11-.5-.17-.78-.17Z" opacity=".9" />
-                <path fill="#fff" fill-opacity="0.9" d="M15 10.25c0-.41.34-.75.75-.75s.75.34.75.75v5.7a.75.75 0 0 1-1.5 0v-5.7Zm.75 8.1c-.55 0-1 .44-1 1s.45 1 1 1c.56 0 1-.44 1-1s-.44-1-1-1Z" />
+                <path fill="#fff" fillOpacity="0.9" d="M15 10.25c0-.41.34-.75.75-.75s.75.34.75.75v5.7a.75.75 0 0 1-1.5 0v-5.7Zm.75 8.1c-.55 0-1 .44-1 1s.45 1 1 1c.56 0 1-.44 1-1s-.44-1-1-1Z" />
               </svg>
             </div>
           </div>

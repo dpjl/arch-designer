@@ -24,21 +24,34 @@ export interface ServiceNodeData extends BaseNodeData {
   networkColors?: string[]; // derived
 }
 
-export interface ContainerNodeData extends BaseNodeData {
-  isContainer: true;
-  width: number;
-  height: number;
-  bgColor?: string;
-  bgOpacity?: number;
-  locked?: boolean;
-  features?: Record<string, any>;
+export interface AutoLayoutConfig {
+  enabled: boolean;
+  leftMargin: number;
+  topMargin: number;
+  itemSpacing: number;
+  lineSpacing: number;
+  useGlobalDefaults?: boolean; // Nouvelle propriété pour utiliser les valeurs globales
 }
 
-export interface NetworkNodeData extends BaseNodeData {
-  width: number;
-  height: number;
-  netId: string; // stable identifier used in memberships
-  // network nodes also act as containers visually
+export interface ContainerNodeData {
+  label: string;
+  color?: string;
+  textColor?: string;
+  width?: number;
+  height?: number;
+  children?: string[];
+  autoLayout?: AutoLayoutConfig;
+}
+
+export interface NetworkNodeData {
+  label: string;
+  color?: string;
+  textColor?: string;
+  width?: number;
+  height?: number;
+  children?: string[];
+  headerPos?: 'top' | 'left';
+  autoLayout?: AutoLayoutConfig;
 }
 
 export interface DoorNodeData extends BaseNodeData {

@@ -27,7 +27,9 @@ import ReactFlow, {
 } from "reactflow";
 import "reactflow/dist/style.css";
 import { Button } from "@/components/ui/button";
-import { Toolbar, PropertiesPanel, PalettePanel, ComponentNode, DoorNode, NetworkNode, NetworkLinkEdge, CustomEdge, MODES, GRID_SIZE, CONTAINER_HEADER_HEIGHT, NETWORK_HEADER_HEIGHT, DEFAULT_DOOR_WIDTH, DEFAULT_DOOR_HEIGHT, HISTORY_STORAGE_KEY, SNAP_STORAGE_KEY, hexToRgba, autoTextColor, isAncestor, updateNetworkLinksForService, isNetworkLink } from './diagram';
+import { Toolbar, PropertiesPanel, PalettePanel, ComponentNode, DoorNode, NetworkNode, NetworkLinkEdge, CustomEdge, MODES, GRID_SIZE, CONTAINER_HEADER_HEIGHT, NETWORK_HEADER_HEIGHT, DEFAULT_DOOR_WIDTH, DEFAULT_DOOR_HEIGHT, HISTORY_STORAGE_KEY, SNAP_STORAGE_KEY, hexToRgba, autoTextColor, isAncestor, updateNetworkLinksForService, isNetworkLink, useAutoLayout } from './diagram';
+import { AutoLayoutProvider, DEFAULT_GLOBAL_AUTO_LAYOUT } from '@/contexts/AutoLayoutContext';
+import { AutoLayoutConfig } from '@/types/diagram';
 import { ThemeProvider } from './theme/ThemeProvider';
 import { useDiagramHistory } from './diagram/hooks/useDiagramHistory';
 import { useDiagramSelection } from './diagram/hooks/useDiagramSelection';
@@ -281,7 +283,13 @@ function NetworksInlineEditor({ selection, onChange, networks }: any){
 // =============================
 // Canvas
 // =============================
-function DiagramCanvas() {
+function DiagramCanvas({ 
+  globalAutoLayoutConfig, 
+  onUpdateGlobalAutoLayoutConfig 
+}: { 
+  globalAutoLayoutConfig: AutoLayoutConfig; 
+  onUpdateGlobalAutoLayoutConfig: (config: AutoLayoutConfig) => void; 
+}) {
   const reactFlowWrapper = useRef<HTMLDivElement | null>(null);
   const { project } = useReactFlow();
   const [mode, setMode] = useState<typeof MODES[keyof typeof MODES]>(MODES.EDIT);
@@ -316,9 +324,12 @@ function DiagramCanvas() {
   // expose setter for resize handles inside node components
   useEffect(() => { (window as any).__setDiagramNodes = setNodes; (window as any).__getDiagramNodes = () => nodes; }, [setNodes, nodes]);
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges as any);
+  
   const { historyRef, lastCommitRef, commitIfChanged, undo, redo } = useDiagramHistory(setNodes, setEdges, showFlash);
   useEffect(()=>{ (window as any).__showFlash = showFlash; },[showFlash]);
   const { selection, setSelection, selectNode } = useDiagramSelection({ setNodes, setEdges, showFlash, enableKeyboardDelete: true, getNodes: () => nodes, getEdges: () => edges });
+  const { applyAutoLayout, isNodeLocked } = useAutoLayout(globalAutoLayoutConfig);
+  
   const [isDark, setIsDark] = useState(false);
   useEffect(()=>{
     const mq = window.matchMedia('(prefers-color-scheme: dark)');
@@ -377,6 +388,38 @@ function DiagramCanvas() {
       return updatedEdges;
     });
   }, [networks, nodes]);
+  
+  // Réorganisation automatique quand les paramètres globaux changent
+  useEffect(() => {
+    // Trouver tous les conteneurs qui utilisent les valeurs globales
+    const containersWithGlobalDefaults = nodes.filter(node => 
+      node.data?.autoLayout?.enabled && 
+      node.data?.autoLayout?.useGlobalDefaults &&
+      (node.data?.isContainer || node.type === 'network')
+    );
+    
+    if (containersWithGlobalDefaults.length > 0) {
+      setNodes((nds) => {
+        let updatedNodes = [...nds];
+        
+        containersWithGlobalDefaults.forEach(containerNode => {
+          const childNodes = nds.filter(n => n.parentNode === containerNode.id);
+          if (childNodes.length > 0) {
+            const layoutResult = applyAutoLayout(
+              containerNode, 
+              childNodes, 
+              updatedNodes, 
+              containerNode.data.autoLayout
+            );
+            updatedNodes = layoutResult;
+          }
+        });
+        
+        return updatedNodes;
+      });
+    }
+  }, [globalAutoLayoutConfig]); // Se déclenche quand les paramètres globaux changent
+  
   // Track changes
   useEffect(()=>{ commitIfChanged(nodes, edges); }, [nodes, edges, commitIfChanged]);
   useEffect(()=>{ const handler=(e:KeyboardEvent)=>{ if((e.ctrlKey||e.metaKey)&&!e.shiftKey&&e.key.toLowerCase()==='z'){ e.preventDefault(); undo(); } else if((e.ctrlKey||e.metaKey)&&(e.key.toLowerCase()==='y'||(e.shiftKey&&e.key.toLowerCase()==='z'))){ e.preventDefault(); redo(); } }; window.addEventListener('keydown', handler); return ()=> window.removeEventListener('keydown', handler); },[undo,redo]);
@@ -403,6 +446,46 @@ function DiagramCanvas() {
 
   // Selection zIndex correction: keep containers at depth z-index even when selected
   useEffect(()=>{ enforceContainerSelectedZ(selection, setNodes); }, [selection, setNodes]);
+
+  // Auto-layout surveillance des redimensionnements
+  useEffect(() => {
+    const resizeObserver = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        const nodeId = entry.target.getAttribute('data-id');
+        if (nodeId) {
+          const node = nodes.find(n => n.id === nodeId);
+          if (node?.data?.autoLayout?.enabled && (node.data?.isContainer || node.type === 'network')) {
+            // Réorganiser automatiquement après un petit délai
+            setTimeout(() => {
+              setNodes((nds) => {
+                const containerNode = nds.find(n => n.id === nodeId);
+                if (!containerNode?.data?.autoLayout?.enabled) return nds;
+                
+                const childNodes = nds.filter(n => n.parentNode === nodeId);
+                return applyAutoLayout(containerNode, childNodes, nds, containerNode.data.autoLayout);
+              });
+            }, 100);
+          }
+        }
+      }
+    });
+
+    // Observer tous les conteneurs avec auto-layout
+    const containersWithAutoLayout = nodes.filter(n => 
+      n.data?.autoLayout?.enabled && (n.data?.isContainer || n.type === 'network')
+    );
+
+    containersWithAutoLayout.forEach(node => {
+      const element = document.querySelector(`[data-id="${node.id}"]`);
+      if (element) {
+        resizeObserver.observe(element);
+      }
+    });
+
+    return () => {
+      resizeObserver.disconnect();
+    };
+  }, [nodes, applyAutoLayout]);
 
   // Edge patterns CSS injection
   const EdgePatternStyles = () => (
@@ -776,6 +859,56 @@ function DiagramCanvas() {
         setSelection((s:any)=> s && s.id===selection.id ? { ...s } : s);
         return;
       }
+
+      // Mise à jour normale des données AVANT l'auto-layout
+      if (patch.data) {
+        setNodes((nds) => nds.map((n) => (n.id === selection.id ? { ...n, data: { ...n.data, ...patch.data } } : n)));
+        setSelection((s: any) => (s && s.id === selection.id ? { ...s, data: { ...s.data, ...patch.data } } : s));
+      }
+
+      // Handle auto-layout APRÈS la mise à jour des données
+      if (patch.applyAutoLayout && (selection.data?.isContainer || selection.nodeType === 'network')) {
+        // Petite pause pour permettre à React de traiter la mise à jour des données
+        setTimeout(() => {
+          setNodes((nds) => {
+            const containerNode = nds.find(n => n.id === selection.id);
+            if (!containerNode || !containerNode.data?.autoLayout) return nds;
+            
+            const childNodes = nds.filter(n => n.parentNode === selection.id);
+            return applyAutoLayout(containerNode, childNodes, nds, containerNode.data.autoLayout);
+          });
+        }, 1);
+        return;
+      }
+      
+      // Réorganisation automatique si l'auto-layout est activé et si on change la taille
+      // (mais seulement si on n'a pas déjà déclenché l'auto-layout explicitement)
+      if (patch.data && (patch.data.width !== undefined || patch.data.height !== undefined) && 
+          (selection.data?.isContainer || selection.nodeType === 'network') && !patch.applyAutoLayout) {
+        setTimeout(() => {
+          setNodes((nds) => {
+            const containerNode = nds.find(n => n.id === selection.id);
+            if (!containerNode?.data?.autoLayout?.enabled) return nds;
+            
+            const childNodes = nds.filter(n => n.parentNode === selection.id);
+            if (childNodes.length === 0) return nds;
+            
+            // Appliquer l'auto-layout avec agrandissement automatique si nécessaire
+            return applyAutoLayout(containerNode, childNodes, nds, containerNode.data.autoLayout);
+          });
+          
+          // Mettre à jour la sélection si le conteneur a été redimensionné
+          setSelection((s: any) => {
+            if (s && s.id === selection.id) {
+              const updatedNode = nodes.find(n => n.id === selection.id);
+              return updatedNode ? { ...s, data: updatedNode.data } : s;
+            }
+            return s;
+          });
+        }, 50); // Petit délai pour que la mise à jour de taille soit appliquée
+      }
+      
+      // Logique détach inchangée
       if (patch.detachFromParent) {
         setNodes((nds) => nds.map((n) => {
           if (n.id !== selection.id) return n;
@@ -794,9 +927,13 @@ function DiagramCanvas() {
         setSelection((s: any) => ({ ...s, parentNode: undefined, extent: undefined }));
         return;
       }
-      // apply patch
-      setNodes((nds) => nds.map((n) => (n.id === selection.id ? { ...n, ...patch, data: { ...n.data, ...(patch.data || {}) }, draggable: patch?.data?.locked !== undefined ? !patch.data.locked : n.draggable } : n)));
-      setSelection((s: any) => ({ ...s, ...patch, data: { ...s.data, ...(patch.data || {}) } }));
+      
+      // Application du patch (logique de mise à jour réorganisée plus haut)
+      if (!patch.data) {
+        // Si pas de data, application normale
+        setNodes((nds) => nds.map((n) => (n.id === selection.id ? { ...n, ...patch, draggable: patch?.data?.locked !== undefined ? !patch.data.locked : n.draggable } : n)));
+        setSelection((s: any) => ({ ...s, ...patch }));
+      }
       
       // Handle network links when autoLinkToNetworks or networks change
       if (patch.data && (patch.data.hasOwnProperty('autoLinkToNetworks') || patch.data.hasOwnProperty('networks'))) {
@@ -876,8 +1013,27 @@ function DiagramCanvas() {
   const onEdgeDoubleClick = useCallback((_: any, edge: any) => { if (mode !== MODES.EDIT) return; const label = prompt("Label", edge.label || ""); if (label !== null) setEdges((eds) => eds.map((e) => (e.id === edge.id ? { ...e, label } : e))); }, [mode]);
 
   // Persistence
-  const onSave = useCallback(() => { localStorage.setItem("server-arch:nodes", JSON.stringify(nodes)); localStorage.setItem("server-arch:edges", JSON.stringify(edges)); }, [nodes, edges]);
-  const onLoad = useCallback(() => { const n = JSON.parse(localStorage.getItem("server-arch:nodes") || "null"); const e = JSON.parse(localStorage.getItem("server-arch:edges") || "null"); if (n && e) { setNodes(n); setEdges(e); setSelection(null); } }, [setNodes, setEdges]);
+  const onSave = useCallback(() => { 
+    localStorage.setItem("server-arch:nodes", JSON.stringify(nodes)); 
+    localStorage.setItem("server-arch:edges", JSON.stringify(edges)); 
+    localStorage.setItem("server-arch:global-config", JSON.stringify(globalAutoLayoutConfig));
+  }, [nodes, edges, globalAutoLayoutConfig]);
+  
+  const onLoad = useCallback(() => { 
+    const n = JSON.parse(localStorage.getItem("server-arch:nodes") || "null"); 
+    const e = JSON.parse(localStorage.getItem("server-arch:edges") || "null"); 
+    const g = JSON.parse(localStorage.getItem("server-arch:global-config") || "null");
+    
+    if (n && e) { 
+      setNodes(n); 
+      setEdges(e); 
+      setSelection(null); 
+      
+      if (g) {
+        onUpdateGlobalAutoLayoutConfig({ ...DEFAULT_GLOBAL_AUTO_LAYOUT, ...g });
+      }
+    } 
+  }, [setNodes, setEdges, onUpdateGlobalAutoLayoutConfig]);
   const onClear = useCallback(() => { setNodes([]); setEdges([]); setSelection(null); historyRef.current = { past: [], present: { nodes: [], edges: [] }, future: [] }; lastCommitRef.current = Date.now(); try { localStorage.removeItem(HISTORY_STORAGE_KEY); } catch(_){} showFlash('Cleared'); }, [showFlash]);
 
   // Export
@@ -917,9 +1073,13 @@ function DiagramCanvas() {
     } catch (e) { console.error(e); }
   }, []);
 
-  // Export graph as JSON file (nodes + edges)
+  // Export graph as JSON file (nodes + edges + global config)
   const onExportJson = useCallback(() => {
-    const payload = { nodes, edges };
+    const payload = { 
+      nodes, 
+      edges, 
+      globalAutoLayoutConfig 
+    };
     const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -929,9 +1089,9 @@ function DiagramCanvas() {
     a.click();
     a.remove();
     URL.revokeObjectURL(url);
-  }, [nodes, edges]);
+  }, [nodes, edges, globalAutoLayoutConfig]);
 
-  // Import nodes+edges JSON from file
+  // Import nodes+edges+global config JSON from file
   const onImportJson = useCallback(() => {
     const input = document.createElement('input');
     input.type = 'file';
@@ -945,9 +1105,16 @@ function DiagramCanvas() {
         const n = Array.isArray(data?.nodes) ? data.nodes : null;
         const e = Array.isArray(data?.edges) ? data.edges : null;
         if (!n || !e) throw new Error('Invalid JSON: expected { nodes:[], edges:[] }');
+        
         setNodes(n);
         setEdges(e);
         setSelection(null);
+        
+        // Charger les paramètres globaux s'ils existent
+        if (data.globalAutoLayoutConfig) {
+          onUpdateGlobalAutoLayoutConfig({ ...DEFAULT_GLOBAL_AUTO_LAYOUT, ...data.globalAutoLayoutConfig });
+        }
+        
         // Reset history to the imported state
         historyRef.current = { past: [], present: { nodes: JSON.parse(JSON.stringify(n)), edges: JSON.parse(JSON.stringify(e)) }, future: [] };
         lastCommitRef.current = Date.now();
@@ -972,6 +1139,14 @@ function DiagramCanvas() {
 
   const onNodeDragStart = useCallback((evt: any, node: any) => {
   if (document.body.classList.contains('resizing-container')) { evt.stopImmediatePropagation?.(); evt.stopPropagation(); return false; }
+  
+    // Bloquer le mouvement si l'auto-layout est activé pour ce nœud
+    if (isNodeLocked(node, nodes)) {
+      evt.stopImmediatePropagation?.(); 
+      evt.stopPropagation(); 
+      return false;
+    }
+    
     if (evt?.altKey && node.parentNode) {
       setNodes((nds) => nds.map((n) => {
         if (n.id !== node.id) return n;
@@ -982,7 +1157,7 @@ function DiagramCanvas() {
       }));
       setSelection((s: any) => (s && s.id === node.id ? { ...s, parentNode: undefined, extent: undefined } : s));
     }
-  }, [setNodes]);
+  }, [setNodes, isNodeLocked, nodes]);
   // Multi-drag state and handlers
   const dragBundleRef = useRef<{ baseId: string; parentId?: string | null; start: Record<string, { x: number; y: number }> } | null>(null);
 
@@ -1048,10 +1223,20 @@ function DiagramCanvas() {
   const viewLocked = mode === MODES.VIEW;
   const [showLeftPanel, setShowLeftPanel] = useState(true);
   const [showRightPanel, setShowRightPanel] = useState(true);
-  const [snapEnabled, setSnapEnabled] = useState<boolean>(() => {
-    try { return localStorage.getItem('server-arch:snap') === '1'; } catch { return false; }
-  });
-  useEffect(() => { try { localStorage.setItem('server-arch:snap', snapEnabled ? '1' : '0'); } catch {} }, [snapEnabled]);
+  // Hydration note: ne pas lire localStorage dans l'initialisation useState
+  // pour éviter un rendu initial différent (serveur vs client) qui déclenche
+  // un warning de mismatch (aria-label du bouton Snap). On initialise à false
+  // puis on synchronise après montage.
+  const [snapEnabled, setSnapEnabled] = useState<boolean>(false);
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem('server-arch:snap');
+      if (saved) setSnapEnabled(saved === '1');
+    } catch {}
+  }, []);
+  useEffect(() => {
+    try { localStorage.setItem('server-arch:snap', snapEnabled ? '1' : '0'); } catch {}
+  }, [snapEnabled]);
 
   const GRID = 24;
   const snapRound = (v: number) => Math.round(v / GRID) * GRID;
@@ -1075,7 +1260,6 @@ function DiagramCanvas() {
           <div className="pointer-events-none fixed top-20 left-1/2 -translate-x-1/2 z-[200]">
             <div className="px-3 py-1 rounded-full bg-slate-900/80 text-white text-xs shadow backdrop-blur-sm animate-fade-in">
               {historyFlash}
-              <PropertiesPanel selection={selection} onChange={updateSelection} onDelete={deleteSelection} onClosePanel={() => setShowRightPanel(false)} multiCount={nodes.filter(n=>n.selected).length + edges.filter(e=>e.selected).length} onDeleteSelected={() => { const ids = nodes.filter(n=>n.selected).map(n=>n.id); (window as any).__deleteNodesCascade?.(ids); setEdges(eds=>eds.filter(e=>!ids.includes(e.source) && !ids.includes(e.target))); setSelection(null); showFlash('Deleted selection'); }} networks={networks} />
             </div>
           </div>
         )}
@@ -1108,7 +1292,13 @@ function DiagramCanvas() {
           {/* Left Panel */}
           {showLeftPanel ? (
             <div className="w-72 sm:w-80 flex-shrink-0 space-y-4 overflow-y-auto pr-1 hidden md:block">
-              <PalettePanel visible={true} onClose={()=>setShowLeftPanel(false)} onEntryDragStart={onEntryDragStart as any} />
+              <PalettePanel 
+                visible={true} 
+                onClose={()=>setShowLeftPanel(false)} 
+                onEntryDragStart={onEntryDragStart as any}
+                globalAutoLayoutConfig={globalAutoLayoutConfig}
+                onUpdateGlobalAutoLayoutConfig={onUpdateGlobalAutoLayoutConfig}
+              />
             </div>
           ) : (
             <div className="flex-shrink-0 flex items-start pt-2 hidden md:flex">
@@ -1170,7 +1360,16 @@ function DiagramCanvas() {
           {/* Right Panel */}
           {showRightPanel ? (
             <div className="w-72 sm:w-80 flex-shrink-0 overflow-y-auto pl-1 hidden lg:block">
-              <PropertiesPanel selection={selection} onChange={updateSelection} onDelete={deleteSelection} onClosePanel={() => setShowRightPanel(false)} multiCount={nodes.filter(n=>n.selected).length + edges.filter(e=>e.selected).length} onDeleteSelected={() => { setNodes(nds=>nds.filter(n=>!n.selected)); setEdges(eds=>eds.filter(e=>!e.selected)); setSelection(null); showFlash('Deleted selection'); }} networks={networks} />
+              <PropertiesPanel 
+                selection={selection} 
+                onChange={updateSelection} 
+                onDelete={deleteSelection} 
+                onClosePanel={() => setShowRightPanel(false)} 
+                multiCount={nodes.filter(n=>n.selected).length + edges.filter(e=>e.selected).length} 
+                onDeleteSelected={() => { setNodes(nds=>nds.filter(n=>!n.selected)); setEdges(eds=>eds.filter(e=>!e.selected)); setSelection(null); showFlash('Deleted selection'); }} 
+                networks={networks}
+                globalAutoLayoutConfig={globalAutoLayoutConfig}
+              />
             </div>
           ) : (
             <div className="flex-shrink-0 flex items-start pt-2 hidden lg:flex">
@@ -1206,7 +1405,16 @@ function DiagramCanvas() {
                 <h2 className="font-semibold text-sm">Propriétés</h2>
                 <button onClick={()=>setShowRightPanel(false)} className="text-xs px-2 py-1 rounded bg-slate-200">Fermer</button>
               </div>
-              <PropertiesPanel selection={selection} onChange={updateSelection} onDelete={deleteSelection} onClosePanel={() => setShowRightPanel(false)} multiCount={nodes.filter(n=>n.selected).length + edges.filter(e=>e.selected).length} onDeleteSelected={() => { setNodes(nds=>nds.filter(n=>!n.selected)); setEdges(eds=>eds.filter(e=>!e.selected)); setSelection(null); showFlash('Deleted selection'); }} networks={networks} />
+              <PropertiesPanel 
+                selection={selection} 
+                onChange={updateSelection} 
+                onDelete={deleteSelection} 
+                onClosePanel={() => setShowRightPanel(false)} 
+                multiCount={nodes.filter(n=>n.selected).length + edges.filter(e=>e.selected).length} 
+                onDeleteSelected={() => { setNodes(nds=>nds.filter(n=>!n.selected)); setEdges(eds=>eds.filter(e=>!e.selected)); setSelection(null); showFlash('Deleted selection'); }} 
+                networks={networks}
+                globalAutoLayoutConfig={globalAutoLayoutConfig}
+              />
             </div>
           )}
         </div>
@@ -1220,11 +1428,29 @@ function DiagramCanvas() {
 // App wrapper (single provider)
 // =============================
 export default function App() {
+  // État pour les paramètres globaux d'auto-layout
+  const [globalAutoLayoutConfig, setGlobalAutoLayoutConfig] = useState<AutoLayoutConfig>(() => {
+    return { ...DEFAULT_GLOBAL_AUTO_LAYOUT, enabled: true }; // Force enabled: true pour les globales
+  });
+
+  // Wrapper pour s'assurer que enabled reste true dans les valeurs globales
+  const updateGlobalAutoLayoutConfig = (config: AutoLayoutConfig) => {
+    setGlobalAutoLayoutConfig({ ...config, enabled: true });
+  };
+
   return (
-    <ReactFlowProvider>
-      <div className="min-h-screen w-full">
-        <DiagramCanvas />
-      </div>
-    </ReactFlowProvider>
+    <AutoLayoutProvider
+      globalConfig={globalAutoLayoutConfig}
+      onUpdateGlobalConfig={updateGlobalAutoLayoutConfig}
+    >
+      <ReactFlowProvider>
+        <div className="min-h-screen w-full">
+          <DiagramCanvas 
+            globalAutoLayoutConfig={globalAutoLayoutConfig}
+            onUpdateGlobalAutoLayoutConfig={updateGlobalAutoLayoutConfig}
+          />
+        </div>
+      </ReactFlowProvider>
+    </AutoLayoutProvider>
   );
 }
