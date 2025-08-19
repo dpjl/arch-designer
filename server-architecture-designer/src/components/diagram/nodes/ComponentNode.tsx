@@ -1,9 +1,9 @@
 "use client";
+import { CONTAINER_HEADER_HEIGHT, GRID_SIZE } from '../constants';
 import React, { memo, useLayoutEffect, useRef, useState } from 'react';
 import { Handle, Position, useStore } from 'reactflow';
 import { Boxes, Lock, Unlock } from 'lucide-react';
 import { useTheme } from '../../theme/ThemeProvider';
-import { CONTAINER_HEADER_HEIGHT } from '../constants';
 import { hexToRgba, autoTextColor } from '../diagram-helpers';
 import { effectiveBorderColor, effectiveBgColor, isAuto } from '../color-utils';
 
@@ -68,7 +68,9 @@ const ComponentNode = memo(({ id, data, selected, isConnectable }: ComponentNode
   const borderColor = effectiveBorderColor(color, isDark);
   const baseBg = effectiveBgColor(bgColor, isDark);
   const bg = hexToRgba(baseBg, bgOpacity);
-  const showText = zoom >= 0.6;
+  // Previously: hide text when zoom < 0.6 (zoom threshold chosen to reduce clutter).
+  // Requirement: always display the service label even at minimum zoom.
+  const showText = true;
   // dynamic label color if auto background
   const labelColorClass = !isContainer && isAuto(bgColor) ? (isDark ? 'text-slate-100' : 'text-slate-800') : '';
   const handleSize = 16;
@@ -80,13 +82,20 @@ const ComponentNode = memo(({ id, data, selected, isConnectable }: ComponentNode
     if ((e.nativeEvent as any)?.stopImmediatePropagation) (e.nativeEvent as any).stopImmediatePropagation();
     const startX = e.clientX, startY = e.clientY; const startW = width, startH = height;
     document.body.classList.add('resizing-container');
-    const move = (ev: MouseEvent) => {
+  const move = (ev: MouseEvent) => {
       let dw = ev.clientX - startX; let dh = ev.clientY - startY;
       let newW = startW; let newH = startH;
       if (dir.includes('e')) newW = Math.max(200, startW + dw);
       if (dir.includes('s')) newH = Math.max(140, startH + dh);
       if (dir.includes('w')) newW = Math.max(200, startW - dw);
       if (dir.includes('n')) newH = Math.max(140, startH - dh);
+      // Snap dimensions to grid if enabled globally
+      try {
+        if ((window as any).__snapEnabled) {
+          newW = Math.max(200, Math.round(newW / GRID_SIZE) * GRID_SIZE);
+          newH = Math.max(140, Math.round(newH / GRID_SIZE) * GRID_SIZE);
+        }
+      } catch {}
       const setNodesFn = (window as any).__setDiagramNodes;
       if (typeof setNodesFn === 'function') {
         setNodesFn((nds: any[]) => nds.map(n => n.id === id ? { ...n, draggable: false, data: { ...n.data, width: newW, height: newH }, style: { ...(n.style||{}), width: newW, height: newH } } : n));

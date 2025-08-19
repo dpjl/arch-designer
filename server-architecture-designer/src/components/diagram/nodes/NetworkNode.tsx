@@ -1,7 +1,7 @@
 "use client";
 import React, { memo } from 'react';
 import { Handle, Position } from 'reactflow';
-import { CONTAINER_HEADER_HEIGHT, NETWORK_HEADER_HEIGHT } from '../constants';
+import { CONTAINER_HEADER_HEIGHT, NETWORK_HEADER_HEIGHT, GRID_SIZE } from '../constants';
 import { hexToRgba } from '../diagram-helpers';
 
 interface NetworkNodeProps { id: string; data: any; selected: boolean; isConnectable: boolean; }
@@ -17,13 +17,19 @@ const NetworkNode = memo(({ id, data, selected, isConnectable }: NetworkNodeProp
     if ((e.nativeEvent as any)?.stopImmediatePropagation) (e.nativeEvent as any).stopImmediatePropagation();
     const startX = (e as any).clientX, startY = (e as any).clientY; const startW = width, startH = height;
     document.body.classList.add('resizing-container');
-    const move = (ev: MouseEvent) => {
+  const move = (ev: MouseEvent) => {
       let dw = ev.clientX - startX; let dh = ev.clientY - startY;
       let newW = startW; let newH = startH;
       if (dir.includes('e')) newW = Math.max(200, startW + dw);
       if (dir.includes('s')) newH = Math.max(140, startH + dh);
       if (dir.includes('w')) newW = Math.max(200, startW - dw);
       if (dir.includes('n')) newH = Math.max(140, startH - dh);
+      try {
+        if ((window as any).__snapEnabled) {
+          newW = Math.max(200, Math.round(newW / GRID_SIZE) * GRID_SIZE);
+          newH = Math.max(140, Math.round(newH / GRID_SIZE) * GRID_SIZE);
+        }
+      } catch {}
       const setNodesFn = (window as any).__setDiagramNodes;
       if (typeof setNodesFn === 'function') {
         setNodesFn((nds: any[]) => nds.map(n => n.id === id ? { ...n, draggable: false, data: { ...n.data, width: newW, height: newH }, style: { ...(n.style||{}), width: newW, height: newH } } : n));

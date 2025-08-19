@@ -106,6 +106,9 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
   const isContainer = isNode && !!selection.data?.isContainer;
   const isDoor = isNode && !!selection.data?.isDoor;
   const isNetwork = isNode && selection.nodeType === 'network';
+  // Local buffer states to avoid disruptive re-renders while typing
+  const [tempNetworkLabel, setTempNetworkLabel] = React.useState<string | null>(null);
+  React.useEffect(()=>{ if (isNetwork) { setTempNetworkLabel(selection.data?.label || ''); } else { setTempNetworkLabel(null); } }, [isNetwork, selection.id]);
 
   return (
   <Card className="rounded-2xl text-[13px] bg-white/80 dark:bg-slate-800/80 backdrop-blur border border-slate-200 dark:border-slate-600 dark:shadow-[0_0_0_1px_rgba(255,255,255,0.05)]">
@@ -125,7 +128,24 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
                 <SectionTitle>Network</SectionTitle>
                 <div className="space-y-1">
                   <Label>Label</Label>
-                  <Input value={selection.data.label || ''} onChange={(e)=> onChange({ data: { ...selection.data, label: e.target.value } })} />
+                  <Input
+                    value={tempNetworkLabel ?? ''}
+                    onChange={(e)=> setTempNetworkLabel(e.target.value)}
+                    onBlur={()=> {
+                      if (tempNetworkLabel !== null && tempNetworkLabel !== selection.data.label) {
+                        onChange({ data: { ...selection.data, label: tempNetworkLabel } });
+                      }
+                    }}
+                    onKeyDown={(e)=> {
+                      if (e.key === 'Enter') {
+                        (e.target as HTMLInputElement).blur();
+                      }
+                      if (e.key === 'Escape') {
+                        setTempNetworkLabel(selection.data.label || '');
+                        (e.target as HTMLInputElement).blur();
+                      }
+                    }}
+                  />
                 </div>
                 <div className="space-y-1">
                   <Label>Color</Label>

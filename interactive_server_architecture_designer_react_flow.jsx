@@ -153,7 +153,8 @@ const FeaturesIcons = memo(({ features, compact }: any) => {
 const ServiceNode = memo(({ data, isConnectable }: any) => {
   const zoom = useStore((s) => s.transform[2]);
   const { label, icon, color, features = {} } = data || {};
-  const showText = zoom >= 0.6;
+  // Always show text now (was: const showText = zoom >= 0.6)
+  const showText = true;
   const borderColor = color || "#94a3b8";
   return (
     <div className="group rounded-2xl shadow-lg bg-white p-2 w-[220px] hover:shadow-xl transition overflow-hidden border" style={{ borderColor }}>

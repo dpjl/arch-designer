@@ -1236,6 +1236,7 @@ function DiagramCanvas({
   }, []);
   useEffect(() => {
     try { localStorage.setItem('server-arch:snap', snapEnabled ? '1' : '0'); } catch {}
+  try { (window as any).__snapEnabled = snapEnabled; } catch {}
   }, [snapEnabled]);
 
   const GRID = 24;
