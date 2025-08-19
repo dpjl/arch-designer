@@ -1,6 +1,7 @@
 import { useCallback } from 'react';
 import { Node } from 'reactflow';
 import { AutoLayoutConfig } from '@/types/diagram';
+import { CONTAINER_HEADER_HEIGHT, NETWORK_HEADER_HEIGHT } from '../constants';
 
 export const useAutoLayout = (globalConfig: AutoLayoutConfig) => {
   // Fonction pour vérifier si un nœud doit être bloqué
@@ -54,9 +55,12 @@ export const useAutoLayout = (globalConfig: AutoLayoutConfig) => {
       return nodes;
     }
 
-    const containerData = containerNode.data || {};
-    const containerWidth = containerData.width || containerNode.width || 300;
-    const containerHeight = containerData.height || containerNode.height || 200;
+  const containerData = containerNode.data || {} as any;
+  const containerWidth = (containerData.width || containerNode.width || 300) as number;
+  const containerHeight = (containerData.height || containerNode.height || 200) as number;
+  const headerPos = (containerData.headerPos || 'top') as 'top'|'left';
+  const isNetwork = containerNode.type === 'network';
+  const headerLeft = headerPos === 'left' ? (isNetwork ? NETWORK_HEADER_HEIGHT : CONTAINER_HEADER_HEIGHT) : 0;
 
     // Configuration effective : DIRECTEMENT depuis les valeurs globales si demandé
     const effectiveConfig = autoLayoutConfig.useGlobalDefaults ? {
@@ -69,19 +73,39 @@ export const useAutoLayout = (globalConfig: AutoLayoutConfig) => {
     } : autoLayoutConfig;
 
     // Configuration d'auto-layout
-    const {
-      leftMargin,
-      topMargin,
-      itemSpacing,
-      lineSpacing
-    } = effectiveConfig;
+    const { leftMargin, topMargin, itemSpacing, lineSpacing } = effectiveConfig;
 
-    // Calcul de l'espace disponible pour les éléments
-    const availableWidth = containerWidth - (leftMargin * 2);
-    const availableHeight = containerHeight - (topMargin * 2);
-    
-    // Trier les enfants en préservant l'ordre des colonnes existantes
-  const sortedChildren = [...layoutChildren].sort((a, b) => {
+    // Partitions
+    const partitions = Math.max(1, Math.min(12, parseInt(String(containerData.partitions ?? 1), 10) || 1));
+    const innerWidth = containerWidth - headerLeft;
+    const partitionWidth = innerWidth / partitions;
+
+    // Ensure children have a stable partition assignment (data.parentPartition)
+    // and clamp to valid range
+    const childPartitionIndex: Record<string, number> = {};
+    layoutChildren.forEach(c => {
+      let idx: number | undefined = (c as any).data?.parentPartition;
+      if (typeof idx !== 'number' || isNaN(idx)) {
+        // infer from current x
+        const localX = Math.max(0, (c.position.x - headerLeft));
+        idx = Math.floor(localX / partitionWidth);
+      }
+      if (idx < 0) idx = 0; if (idx >= partitions) idx = partitions - 1;
+      childPartitionIndex[c.id] = idx;
+    });
+
+    // We will accumulate updates here
+    let updatedNodes = nodes.map(node => {
+      if (!childPartitionIndex[node.id]) return node;
+      const idx = childPartitionIndex[node.id];
+      const d = { ...(node as any).data, parentPartition: idx };
+      return { ...node, data: d } as any;
+    });
+
+    // Helper to layout a subset (one partition)
+    const layoutPartition = (subset: Node[], partitionIndex: number) => {
+      // Trier les enfants en préservant l'ordre des colonnes existantes
+      const sortedChildren = [...subset].sort((a, b) => {
       // Analyser si deux éléments sont dans la même colonne visuelle
       // (au moins un pixel en commun horizontalement)
       const aLeft = a.position.x;
@@ -104,25 +128,24 @@ export const useAutoLayout = (globalConfig: AutoLayoutConfig) => {
         }
         return a.position.y - b.position.y;
       }
-    });
+      });
 
-    // Calculer les nouvelles positions - REMPLISSAGE PAR COLONNES
-    let currentColumn = 0;
-    let currentYInColumn = topMargin;
-    let newHeight = topMargin;
-    
-    // Stocker les éléments par colonne pour calculer les largeurs
-    const columnElements: { [key: number]: typeof sortedChildren } = {};
-    const columnWidths: { [key: number]: number } = {};
-    const elementPositions: { [key: string]: { x: number; y: number; column: number } } = {};
-    
-    // Premier passage : répartir les éléments dans les colonnes
-    sortedChildren.forEach((child) => {
+      // Calculer les nouvelles positions - REMPLISSAGE PAR COLONNES
+      let currentColumn = 0;
+      let currentYInColumn = topMargin;
+      
+      // Stocker les éléments par colonne pour calculer les largeurs
+      const columnElements: { [key: number]: typeof sortedChildren } = {} as any;
+      const columnWidths: { [key: number]: number } = {} as any;
+      const elementPositions: { [key: string]: { x: number; y: number; column: number } } = {} as any;
+      
+      // Premier passage : répartir les éléments dans les colonnes
+      sortedChildren.forEach((child) => {
       // Calculer la hauteur réelle de l'élément (y compris les onglets/instances)
       const nodeHeight = calculateRealNodeHeight(child);
       
       // Vérifier si l'élément rentre dans la colonne actuelle
-      if (currentYInColumn + nodeHeight + topMargin > containerHeight && currentYInColumn > topMargin) {
+        if (currentYInColumn + nodeHeight + topMargin > containerHeight && currentYInColumn > topMargin) {
         // Passer à la colonne suivante
         currentColumn++;
         currentYInColumn = topMargin;
@@ -150,45 +173,55 @@ export const useAutoLayout = (globalConfig: AutoLayoutConfig) => {
       // Mettre à jour la position Y pour le prochain élément dans cette colonne
       // Utiliser la hauteur réelle + interligne
       currentYInColumn += nodeHeight + lineSpacing;
-      newHeight = Math.max(newHeight, currentYInColumn + topMargin);
-    });
-    
-    // Deuxième passage : calculer les positions X et Y ajustées
-    const updatedNodes = nodes.map(node => {
-      const nodePosition = elementPositions[node.id];
-      
-      if (nodePosition && node.parentNode === containerNode.id) {
-        // Calculer la position X en additionnant les largeurs des colonnes précédentes
-        let positionX = leftMargin;
-        for (let col = 0; col < nodePosition.column; col++) {
-          positionX += (columnWidths[col] || 0) + itemSpacing;
+      });
+
+      // Deuxième passage : calculer les positions X et Y ajustées
+      updatedNodes = updatedNodes.map(node => {
+        const nodePosition = elementPositions[node.id];
+        if (nodePosition && node.parentNode === containerNode.id && childPartitionIndex[node.id] === partitionIndex) {
+          // Calculer la position X en additionnant les largeurs des colonnes précédentes
+          let positionX = headerLeft + partitionIndex * partitionWidth + leftMargin;
+          for (let col = 0; col < nodePosition.column; col++) {
+            positionX += (columnWidths[col] || 0) + itemSpacing;
+          }
+          
+          // Calculer la position Y ajustée pour les onglets d'instances
+          let positionY = nodePosition.y;
+          if ((node as any).data?.instances && Array.isArray((node as any).data.instances) && (node as any).data.instances.length > 0) {
+            // Décaler vers le bas pour laisser l'espace aux onglets au-dessus
+            positionY += 24;
+          }
+          
+          return {
+            ...node,
+            position: { x: positionX, y: positionY }
+          } as any;
         }
-        
-        // Calculer la position Y ajustée pour les onglets d'instances
-        let positionY = nodePosition.y;
-        if (node.data?.instances && Array.isArray(node.data.instances) && node.data.instances.length > 0) {
-          // Décaler vers le bas pour laisser l'espace aux onglets au-dessus
-          positionY += 24;
-        }
-        
-        return {
-          ...node,
-          position: { x: positionX, y: positionY }
-        };
-      }
-      
-      return node;
-    });
+        return node;
+      });
+    };
+
+    // Layout per partition
+    for (let p = 0; p < partitions; p++) {
+      const subset = layoutChildren.filter(c => childPartitionIndex[c.id] === p);
+      if (subset.length > 0) layoutPartition(subset, p);
+    }
 
     // Ajuster la taille du conteneur si nécessaire (jamais réduire)
-    const updatedContainer = updatedNodes.find(n => n.id === containerNode.id);
+    const updatedContainer = updatedNodes.find(n => n.id === containerNode.id) as any;
     if (updatedContainer) {
+      // Compute max Y bottom across children to determine height
+      let maxBottom = topMargin;
+      updatedNodes.forEach(n => {
+        if (n.parentNode !== containerNode.id) return;
+        const h = (n as any).height || (n as any).data?.height || (n as any).style?.height || 80;
+        const y = n.position.y + h;
+        if (y > maxBottom) maxBottom = y;
+      });
       const currentHeight = updatedContainer.data?.height || updatedContainer.height || 200;
+      const newHeight = Math.max(currentHeight, maxBottom + topMargin);
       if (newHeight > currentHeight) {
-        updatedContainer.data = {
-          ...updatedContainer.data,
-          height: newHeight
-        };
+        updatedContainer.data = { ...updatedContainer.data, height: newHeight };
       }
     }
 

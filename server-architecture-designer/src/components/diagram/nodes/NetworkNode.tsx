@@ -8,6 +8,7 @@ interface NetworkNodeProps { id: string; data: any; selected: boolean; isConnect
 
 const NetworkNode = memo(({ id, data, selected, isConnectable }: NetworkNodeProps) => {
   const { label = 'Network', color = '#10b981', textColor, width = 420, height = 240, headerPos = 'top' } = data || {};
+  const partitions = Math.max(1, Math.min(12, parseInt(String(data?.partitions ?? 1), 10) || 1));
   const text = textColor || '#0f172a';
   const bgTint = hexToRgba(color || '#10b981', 0.08);
   const handleSize = 16;
@@ -41,7 +42,7 @@ const NetworkNode = memo(({ id, data, selected, isConnectable }: NetworkNodeProp
   return (
     <div className="relative" style={{ width, height }}>
       {selected && <div className="absolute inset-0 -m-1 rounded-2xl ring-2 ring-blue-500 pointer-events-none" />}
-  <div className="rounded-2xl relative border shadow-sm overflow-visible" style={{ borderColor: color, width: '100%', height: '100%' }}>
+  <div className="rounded-2xl relative border shadow-sm overflow-visible" data-partitions={partitions} style={{ borderColor: color, width: '100%', height: '100%' }}>
         {/* Connection handles for network links - always present for React Flow but visually hidden when not selected */}
         <Handle 
           type="target" 
@@ -109,6 +110,43 @@ const NetworkNode = memo(({ id, data, selected, isConnectable }: NetworkNodeProp
           </div>
         </div>)}
   <div className="absolute inset-0 rounded-2xl overflow-hidden" style={{ background: bgTint }} />
+        {/* Partition separators and badges */}
+        {partitions > 1 && (
+          <div className="absolute inset-0 pointer-events-none" aria-hidden>
+            {Array.from({ length: partitions - 1 }).map((_, i) => {
+              const innerW = width - (headerPos==='left'?NETWORK_HEADER_HEIGHT:0);
+              const step = innerW / partitions;
+              const x = (headerPos==='left'?NETWORK_HEADER_HEIGHT:0) + Math.round(step * (i + 1));
+              return (
+                <div key={`guide-${i}`} className="absolute" style={{ left: x, top: 0, bottom: 0 }}>
+                  <div className="absolute inset-0" style={{ borderLeft: `1px solid ${color}`, opacity: 0.9 }} />
+                </div>
+              );
+            })}
+            {/* Per-partition badges centered */}
+            {Array.from({ length: partitions }).map((_, i) => {
+              const innerW = width - (headerPos==='left'?NETWORK_HEADER_HEIGHT:0);
+              const step = innerW / partitions;
+              const left = (headerPos==='left'?NETWORK_HEADER_HEIGHT:0) + Math.round(step * i + step/2);
+              const url = Array.isArray(data?.partitionIcons) ? data.partitionIcons[i] : undefined;
+              const txt = Array.isArray((data as any)?.partitionBadgeTexts) ? (data as any).partitionBadgeTexts[i] : undefined;
+              return (
+        <div key={`badge-${i}`} className="absolute" style={{ left, top: 10, transform:'translate(-50%, -50%)' }}>
+                  {(url || txt) ? (
+          <div className="max-w-[160px] rounded-xl shadow border overflow-hidden" style={{ borderColor: color, background: `color-mix(in srgb, ${color} 20%, #ffffff 80%)` }}>
+                      <div className="px-2 h-8 inline-flex items-center gap-1 whitespace-nowrap">
+                        {url && <img src={url} alt="" className="h-5 w-5 object-contain" />}
+                        {txt && <span className="text-xs font-semibold text-slate-700 dark:text-slate-100 truncate max-w-[130px]" style={{ fontVariant:'small-caps', letterSpacing: '0.3px' }}>{txt}</span>}
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="h-1.5 w-1.5 rounded-full" style={{ background: color, opacity: 0.7 }} />
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
         {showHandles && (
           <>
             <div data-resize onMouseDownCapture={(e)=>startResize(e,'e')} className="absolute top-1/2 right-0 -translate-y-1/2 translate-x-1/2 cursor-ew-resize bg-blue-500 hover:bg-blue-600 border-2 border-white hover:border-blue-200 rounded-full shadow-lg hover:shadow-xl transition-all duration-150 z-10" style={{ width: handleSize, height: handleSize }} />

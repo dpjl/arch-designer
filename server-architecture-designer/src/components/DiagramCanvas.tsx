@@ -754,7 +754,7 @@ function DiagramCanvas({
   const absPos = { x: node.position.x + parentAbs.x, y: node.position.y + parentAbs.y + (parentNode ? headerOffsetFor(parentNode) : 0) };
   const container = findContainerAt(absPos, node.id);
 
-    setNodes((nds) => nds.map((n) => {
+  setNodes((nds) => nds.map((n) => {
       if (n.id !== node.id) return n;
       // Snap doors to walls and restrict movement along the wall
     if (n.type === 'door') {
@@ -777,11 +777,20 @@ function DiagramCanvas({
         if (n.type==='network' && container.type==='network') return n;
         const headerOffset = headerOffsetFor(container);
         const containerAbs = absoluteOf(container);
+        // Determine partition index for new child based on x within container
+        const isNet = container.type==='network';
+        const headerLeft = (container.data?.headerPos||'top')==='left' ? (isNet?NETWORK_HEADER_HEIGHT:CONTAINER_HEADER_HEIGHT) : 0;
+        const partitions = Math.max(1, Math.min(12, parseInt(String(container.data?.partitions ?? 1), 10) || 1));
+        const innerW = (container.data?.width||container.style?.width||container.width||520) - headerLeft;
+        const partW = innerW / partitions;
+        const localX = absPos.x - containerAbs.x - headerLeft;
+        let pIdx = Math.floor(localX / partW); if (pIdx < 0) pIdx = 0; if (pIdx >= partitions) pIdx = partitions - 1;
         const next: any = {
           ...n,
           parentNode: container.id,
           extent: "parent",
           position: { x: absPos.x - containerAbs.x, y: absPos.y - containerAbs.y - headerOffset },
+          data: { ...(n.data||{}), parentPartition: pIdx }
         };
         if (n.type==='component' && !n.data?.isContainer && container.type==='network') {
           const netId = container.data?.netId || container.id;
@@ -862,8 +871,65 @@ function DiagramCanvas({
 
       // Mise à jour normale des données AVANT l'auto-layout
       if (patch.data) {
-        setNodes((nds) => nds.map((n) => (n.id === selection.id ? { ...n, data: { ...n.data, ...patch.data } } : n)));
-        setSelection((s: any) => (s && s.id === selection.id ? { ...s, data: { ...s.data, ...patch.data } } : s));
+        const partitionsChanging = Object.prototype.hasOwnProperty.call(patch.data, 'partitions');
+        if (!partitionsChanging) {
+          setNodes((nds) => nds.map((n) => (n.id === selection.id ? { ...n, data: { ...n.data, ...patch.data } } : n)));
+        } else {
+          // Apply data change, then clamp children into new partitions
+          setNodes((nds) => {
+            const updated = nds.map((n) => {
+              if (n.id !== selection.id) return n;
+              const nextParts = Math.max(1, Math.min(12, parseInt(String((patch.data.partitions ?? n.data?.partitions) ?? 1), 10) || 1));
+              let nextIcons: string[] | undefined = Array.isArray(n.data?.partitionIcons) ? [...n.data.partitionIcons] : [];
+              // Ensure exactly nextParts entries
+              nextIcons = nextIcons.slice(0, nextParts);
+              while (nextIcons.length < nextParts) nextIcons.push('');
+              let nextTexts: string[] | undefined = Array.isArray(n.data?.partitionBadgeTexts) ? [...n.data.partitionBadgeTexts] : [];
+              nextTexts = nextTexts.slice(0, nextParts);
+              while (nextTexts.length < nextParts) nextTexts.push('');
+              return { ...n, data: { ...n.data, ...patch.data, partitionIcons: nextIcons, partitionBadgeTexts: nextTexts } };
+            });
+            const container = updated.find(n => n.id === selection.id);
+            if (!container) return updated;
+            const isNet = container.type === 'network';
+            const headerLeft = (container.data?.headerPos||'top')==='left' ? (isNet?NETWORK_HEADER_HEIGHT:CONTAINER_HEADER_HEIGHT) : 0;
+            const width = (container.data?.width||container.style?.width||container.width||520) as number;
+            const parts = Math.max(1, Math.min(12, parseInt(String(container.data?.partitions ?? 1), 10) || 1));
+            const innerW = width - headerLeft;
+            const partW = innerW / parts;
+            const leftPad = 4;
+            return updated.map(n => {
+              if (n.parentNode !== selection.id) return n;
+              const nodeW = (n as any).width || (n as any).data?.width || (n as any).style?.width || 150;
+              let pIdx = (n as any).data?.parentPartition;
+              if (typeof pIdx !== 'number' || isNaN(pIdx)) {
+                const localX = Math.max(0, n.position.x - headerLeft);
+                pIdx = Math.floor(localX / partW);
+              }
+              if (pIdx < 0) pIdx = 0; if (pIdx >= parts) pIdx = parts - 1;
+              // Clamp X into partition bounds
+              const minX = headerLeft + pIdx * partW + leftPad;
+              const maxX = headerLeft + (pIdx + 1) * partW - nodeW - leftPad;
+              const newX = Math.max(minX, Math.min(n.position.x, maxX));
+              return { ...n, position: { x: newX, y: n.position.y }, data: { ...(n.data||{}), parentPartition: pIdx } };
+            });
+          });
+        }
+        setSelection((s: any) => {
+          if (!s || s.id !== selection.id) return s;
+          // Mirror partitionIcons length when partitions changed
+          if (partitionsChanging) {
+            const nextParts = Math.max(1, Math.min(12, parseInt(String((patch.data.partitions ?? s.data?.partitions) ?? 1), 10) || 1));
+            let nextIcons: string[] | undefined = Array.isArray(s.data?.partitionIcons) ? [...s.data.partitionIcons] : [];
+            nextIcons = nextIcons.slice(0, nextParts);
+            while (nextIcons.length < nextParts) nextIcons.push('');
+            let nextTexts: string[] | undefined = Array.isArray(s.data?.partitionBadgeTexts) ? [...s.data.partitionBadgeTexts] : [];
+            nextTexts = nextTexts.slice(0, nextParts);
+            while (nextTexts.length < nextParts) nextTexts.push('');
+            return { ...s, data: { ...s.data, ...patch.data, partitionIcons: nextIcons, partitionBadgeTexts: nextTexts } };
+          }
+          return { ...s, data: { ...s.data, ...patch.data } };
+        });
       }
 
       // Handle auto-layout APRÈS la mise à jour des données
@@ -888,13 +954,35 @@ function DiagramCanvas({
         setTimeout(() => {
           setNodes((nds) => {
             const containerNode = nds.find(n => n.id === selection.id);
-            if (!containerNode?.data?.autoLayout?.enabled) return nds;
-            
+            if (!containerNode) return nds;
             const childNodes = nds.filter(n => n.parentNode === selection.id);
             if (childNodes.length === 0) return nds;
-            
-            // Appliquer l'auto-layout avec agrandissement automatique si nécessaire
-            return applyAutoLayout(containerNode, childNodes, nds, containerNode.data.autoLayout);
+            if (containerNode.data?.autoLayout?.enabled) {
+              // Appliquer l'auto-layout avec agrandissement automatique si nécessaire
+              return applyAutoLayout(containerNode, childNodes, nds, containerNode.data.autoLayout);
+            }
+            // Sinon, simplement RE-CLAMP dans les partitions
+            const isNet = containerNode.type === 'network';
+            const headerLeft = (containerNode.data?.headerPos||'top')==='left' ? (isNet?NETWORK_HEADER_HEIGHT:CONTAINER_HEADER_HEIGHT) : 0;
+            const width = (containerNode.data?.width||containerNode.style?.width||containerNode.width||520) as number;
+            const parts = Math.max(1, Math.min(12, parseInt(String(containerNode.data?.partitions ?? 1), 10) || 1));
+            const innerW = width - headerLeft;
+            const partW = innerW / parts;
+            const leftPad = 4;
+            return nds.map(n => {
+              if (n.parentNode !== selection.id) return n;
+              const nodeW = (n as any).width || (n as any).data?.width || (n as any).style?.width || 150;
+              let pIdx = (n as any).data?.parentPartition;
+              if (typeof pIdx !== 'number' || isNaN(pIdx)) {
+                const localX = Math.max(0, n.position.x - headerLeft);
+                pIdx = Math.floor(localX / partW);
+              }
+              if (pIdx < 0) pIdx = 0; if (pIdx >= parts) pIdx = parts - 1;
+              const minX = headerLeft + pIdx * partW + leftPad;
+              const maxX = headerLeft + (pIdx + 1) * partW - nodeW - leftPad;
+              const newX = Math.max(minX, Math.min(n.position.x, maxX));
+              return { ...n, position: { x: newX, y: n.position.y }, data: { ...(n.data||{}), parentPartition: pIdx } };
+            });
           });
           
           // Mettre à jour la sélection si le conteneur a été redimensionné
@@ -1159,7 +1247,16 @@ function DiagramCanvas({
     }
   }, [setNodes, isNodeLocked, nodes]);
   // Multi-drag state and handlers
-  const dragBundleRef = useRef<{ baseId: string; parentId?: string | null; start: Record<string, { x: number; y: number }> } | null>(null);
+  const dragBundleRef = useRef<{
+    baseId: string;
+    parentId?: string | null;
+    start: Record<string, { x: number; y: number }>;
+    partIndex?: Record<string, number>;
+    headerLeft?: number;
+    partitions?: number;
+    partitionWidth?: number;
+    containerWidth?: number;
+  } | null>(null);
 
   // =========
   // Cascade delete helpers
@@ -1205,17 +1302,66 @@ function DiagramCanvas({
     const subset = nodes.filter(n => ids.includes(n.id) && (n.parentNode ?? null) === parentId);
     const start: Record<string, { x: number; y: number }> = {};
     subset.forEach(n => { start[n.id] = { x: n.position.x, y: n.position.y }; });
-    dragBundleRef.current = { baseId: node.id, parentId, start };
+    // Partition context if inside a container
+    let partIndex: Record<string, number> | undefined = undefined;
+    let headerLeft: number | undefined = undefined;
+    let partitions: number | undefined = undefined;
+    let partitionWidth: number | undefined = undefined;
+    let containerWidth: number | undefined = undefined;
+    if (parentId) {
+      const parent = nodes.find(n => n.id === parentId);
+      if (parent) {
+        const isNet = parent.type === 'network';
+        const headerPos = (parent.data?.headerPos||'top');
+        headerLeft = headerPos==='left' ? (isNet?NETWORK_HEADER_HEIGHT:CONTAINER_HEADER_HEIGHT) : 0;
+        const width = (parent.data?.width||parent.style?.width||parent.width||520) as number;
+        containerWidth = width;
+        partitions = Math.max(1, Math.min(12, parseInt(String(parent.data?.partitions ?? 1), 10) || 1));
+        const innerW = width - (headerLeft||0);
+        partitionWidth = innerW / partitions;
+        partIndex = {};
+        subset.forEach(n => {
+          let idx = (n as any).data?.parentPartition;
+          if (typeof idx !== 'number' || isNaN(idx)) {
+            const localX = Math.max(0, n.position.x - (headerLeft||0));
+            idx = Math.floor(localX / (partitionWidth||innerW));
+          }
+          if (idx < 0) idx = 0; if (idx >= (partitions||1)) idx = (partitions||1) - 1;
+          partIndex![n.id] = idx;
+        });
+      }
+    }
+    dragBundleRef.current = { baseId: node.id, parentId, start, partIndex, headerLeft, partitions, partitionWidth, containerWidth };
   }, [nodes]);
-  const onNodeDrag = useCallback((_: any, node: any) => {
+  const onNodeDrag = useCallback((evt: any, node: any) => {
     const ref = dragBundleRef.current; if (!ref) return;
     const baseStart = ref.start[node.id]; if (!baseStart) return;
     const dx = node.position.x - baseStart.x; const dy = node.position.y - baseStart.y;
     if (dx === 0 && dy === 0) return;
     setNodes((nds) => nds.map(n => {
       if (!ref.start[n.id]) return n; // only move captured ones
-      if (n.id === node.id) return n; // let React Flow manage dragged node
-      return { ...n, position: { x: ref.start[n.id].x + dx, y: ref.start[n.id].y + dy } };
+      // propose new position
+      let newX = ref.start[n.id].x + dx;
+      let newY = ref.start[n.id].y + dy;
+      // If partitioned, clamp X within own partition bounds
+      if (ref.parentId && ref.partitions && ref.partitionWidth && ref.headerLeft !== undefined) {
+        const nodeW = (n as any).width || (n as any).data?.width || (n as any).style?.width || 150;
+        const pad = 4;
+        if (evt?.shiftKey) {
+          // Allow crossing partitions; recompute partition index based on center X
+          const centerX = newX + nodeW / 2;
+          let idx = Math.floor((centerX - (ref.headerLeft||0)) / (ref.partitionWidth||1));
+          if (idx < 0) idx = 0; if (idx >= (ref.partitions||1)) idx = (ref.partitions||1) - 1;
+          // store live new index so all nodes in bundle keep their column
+          if (!ref.partIndex) ref.partIndex = {};
+          ref.partIndex[n.id] = idx;
+        }
+        const idx = ref.partIndex?.[n.id] ?? 0;
+        const left = (ref.headerLeft||0) + idx * (ref.partitionWidth||1) + 0;
+        const right = (ref.headerLeft||0) + (idx + 1) * (ref.partitionWidth||1);
+        newX = Math.max(left + pad, Math.min(newX, right - nodeW - pad));
+      }
+      return { ...n, position: { x: newX, y: newY }, data: { ...(n as any).data, parentPartition: ref.partIndex?.[n.id] ?? (n as any).data?.parentPartition } } as any;
     }));
   }, [setNodes]);
   const onNodeDragStopMulti = useCallback(() => { dragBundleRef.current = null; }, []);

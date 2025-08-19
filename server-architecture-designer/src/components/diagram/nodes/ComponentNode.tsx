@@ -106,6 +106,7 @@ const ComponentNode = memo(({ id, data, selected, isConnectable }: ComponentNode
   };
 
   const headerPos = (data?.headerPos || 'top') as 'top'|'left';
+  const partitions = Math.max(1, Math.min(12, parseInt(String(data?.partitions ?? 1), 10) || 1));
   if (isContainer) {
     const tex = getBrickTexture();
     return (
@@ -135,7 +136,7 @@ const ComponentNode = memo(({ id, data, selected, isConnectable }: ComponentNode
             </div>
           </div>
         )}
-        <div className={`rounded-2xl overflow-hidden relative ${selected ? 'container-sel' : ''}`} style={{ width: '100%', height: '100%', border: `1px solid ${borderColor}`, background: bg, paddingTop: headerPos==='top'?CONTAINER_HEADER_HEIGHT:0, paddingLeft: headerPos==='left'?CONTAINER_HEADER_HEIGHT:0 }}>
+  <div className={`rounded-2xl overflow-hidden relative ${selected ? 'container-sel' : ''}`} data-partitions={partitions} style={{ width: '100%', height: '100%', border: `1px solid ${borderColor}`, background: bg, paddingTop: headerPos==='top'?CONTAINER_HEADER_HEIGHT:0, paddingLeft: headerPos==='left'?CONTAINER_HEADER_HEIGHT:0 }}>
           {headerPos==='top' && (
           <div className="absolute top-0 left-0 right-0 flex items-center gap-3 px-3 py-2 bg-white/90 dark:bg-slate-900/70 backdrop-blur border-b" style={{ borderColor: borderColor, height: CONTAINER_HEADER_HEIGHT }}>
             {icon ? (
@@ -166,6 +167,43 @@ const ComponentNode = memo(({ id, data, selected, isConnectable }: ComponentNode
               {locked ? <Lock className="h-3.5 w-3.5"/> : <Unlock className="h-3.5 w-3.5"/>}
             </div>
           </div>)}
+          {/* Partition separators and badges */}
+          {partitions > 1 && (
+            <div className="absolute inset-0 pointer-events-none" aria-hidden>
+              {Array.from({ length: partitions - 1 }).map((_, i) => {
+                const innerW = width - (headerPos==='left'?CONTAINER_HEADER_HEIGHT:0);
+                const step = innerW / partitions;
+                const x = (headerPos==='left'?CONTAINER_HEADER_HEIGHT:0) + Math.round(step * (i + 1));
+                return (
+                  <div key={`guide-${i}`} className="absolute" style={{ left: x, top: headerPos==='top'?CONTAINER_HEADER_HEIGHT:0, bottom: 0 }}>
+                    <div className="absolute inset-0" style={{ borderLeft: `1px solid ${borderColor}`, opacity: 0.9 }} />
+                  </div>
+                );
+              })}
+              {/* Per-partition badges centered */}
+              {Array.from({ length: partitions }).map((_, i) => {
+                const innerW = width - (headerPos==='left'?CONTAINER_HEADER_HEIGHT:0);
+                const step = innerW / partitions;
+                const left = (headerPos==='left'?CONTAINER_HEADER_HEIGHT:0) + Math.round(step * i + step/2);
+                const url = Array.isArray(data?.partitionIcons) ? data.partitionIcons[i] : undefined;
+                const txt = Array.isArray((data as any)?.partitionBadgeTexts) ? (data as any).partitionBadgeTexts[i] : undefined;
+                return (
+                  <div key={`badge-${i}`} className="absolute" style={{ left, top: headerPos==='top'?CONTAINER_HEADER_HEIGHT:10, transform:'translate(-50%, -50%)' }}>
+                    {(url || txt) ? (
+                      <div className="max-w-[160px] rounded-xl shadow border overflow-hidden" style={{ borderColor: borderColor, background: `color-mix(in srgb, ${baseBg} 70%, #ffffff 30%)`, backdropFilter:'saturate(1.1) blur(1px)' }}>
+                        <div className="px-2 h-8 inline-flex items-center gap-1 whitespace-nowrap">
+                          {url && <img src={url} alt="" className="h-5 w-5 object-contain" />}
+                          {txt && <span className="text-xs font-semibold text-slate-700 dark:text-slate-100 truncate max-w-[130px]" style={{ fontVariant:'small-caps', letterSpacing: '0.3px' }}>{txt}</span>}
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="h-1.5 w-1.5 rounded-full" style={{ background: borderColor, opacity: 0.7 }} />
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
           {showHandles && (
             <>
               <div data-resize onMouseDownCapture={(e)=>startResize(e,'e')} className="absolute top-1/2 right-0 -translate-y-1/2 translate-x-1/2 cursor-ew-resize bg-blue-500 hover:bg-blue-600 border-2 border-white hover:border-blue-200 rounded-full shadow-lg hover:shadow-xl transition-all duration-150 z-10" style={{ width: handleSize, height: handleSize }} />

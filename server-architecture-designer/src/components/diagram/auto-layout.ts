@@ -37,7 +37,7 @@ export function calculateAutoLayoutPositions(
   }
 
   const positions: { nodeId: string; x: number; y: number }[] = [];
-  const containerWidth = containerNode.data.width;
+  const containerWidth = (containerNode.data.width ?? (containerNode.width as number) ?? 300);
   
   // Calculate how many items fit per row
   const availableWidth = containerWidth - config.marginLeft * 2;
@@ -122,7 +122,7 @@ export function applyAutoLayout(
   
   const childNodes = getContainerChildren(nodes, containerId);
   const positions = calculateAutoLayoutPositions(containerNode, childNodes, config);
-  const requiredHeight = calculateRequiredContainerHeight(childNodes.length, containerNode.data.width, config);
+  const requiredHeight = calculateRequiredContainerHeight(childNodes.length, (containerNode.data.width ?? (containerNode.width as number) ?? 300), config);
   
   // Update nodes with new positions
   return nodes.map(node => {

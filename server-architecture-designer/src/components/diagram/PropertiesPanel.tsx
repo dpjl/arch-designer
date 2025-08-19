@@ -65,6 +65,40 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
   networks,
   globalAutoLayoutConfig 
 }) => {
+  // Shared state for compact partition icon picker popover
+  const [openPartitionPickerIndex, setOpenPartitionPickerIndex] = React.useState<number | null>(null);
+  const [pickerQuery, setPickerQuery] = React.useState('');
+  const [pickerPage, setPickerPage] = React.useState(1);
+  const [openTextIndex, setOpenTextIndex] = React.useState<number | null>(null);
+  const [openUrlIndex, setOpenUrlIndex] = React.useState<number | null>(null);
+  const pageSize = 24;
+  const filteredCatalog = React.useMemo(() => {
+    const q = pickerQuery.trim().toLowerCase();
+    if (!q) return CATALOG;
+    return CATALOG.filter((c: any) => ((c.label || c.id || '').toLowerCase().includes(q)));
+  }, [pickerQuery]);
+  const totalPages = Math.max(1, Math.ceil(filteredCatalog.length / pageSize));
+  const currentItems = React.useMemo(() => {
+    const start = (pickerPage - 1) * pageSize;
+    return filteredCatalog.slice(start, start + pageSize);
+  }, [filteredCatalog, pickerPage]);
+  // Close pickers when selection changes
+  React.useEffect(() => { setOpenPartitionPickerIndex(null); setOpenUrlIndex(null); setPickerQuery(''); setPickerPage(1); }, [selection?.id]);
+  // Compute flags early (guarded) and keep all hooks above any early returns
+  const isNode = !!selection && selection.type === 'node';
+  const isContainer = isNode && !!selection.data?.isContainer;
+  const isDoor = isNode && !!selection.data?.isDoor;
+  const isNetwork = isNode && selection.nodeType === 'network';
+  // Local buffer state for network label editing (must be declared before returns)
+  const [tempNetworkLabel, setTempNetworkLabel] = React.useState<string | null>(null);
+  React.useEffect(() => {
+    if (isNetwork) {
+      setTempNetworkLabel(selection?.data?.label || '');
+    } else {
+      setTempNetworkLabel(null);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isNetwork, selection?.id]);
   if ((multiCount || 0) > 1) {
     return (
   <Card className="rounded-2xl text-[13px] bg-white/80 dark:bg-slate-800/80 backdrop-blur border border-slate-200 dark:border-slate-600 dark:shadow-[0_0_0_1px_rgba(255,255,255,0.05)]">
@@ -102,13 +136,7 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
     );
   }
 
-  const isNode = selection.type === 'node';
-  const isContainer = isNode && !!selection.data?.isContainer;
-  const isDoor = isNode && !!selection.data?.isDoor;
-  const isNetwork = isNode && selection.nodeType === 'network';
-  // Local buffer states to avoid disruptive re-renders while typing
-  const [tempNetworkLabel, setTempNetworkLabel] = React.useState<string | null>(null);
-  React.useEffect(()=>{ if (isNetwork) { setTempNetworkLabel(selection.data?.label || ''); } else { setTempNetworkLabel(null); } }, [isNetwork, selection.id]);
+  // Flags and tempNetworkLabel are defined above to keep hook order stable
 
   return (
   <Card className="rounded-2xl text-[13px] bg-white/80 dark:bg-slate-800/80 backdrop-blur border border-slate-200 dark:border-slate-600 dark:shadow-[0_0_0_1px_rgba(255,255,255,0.05)]">
@@ -147,6 +175,79 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
                     }}
                   />
                 </div>
+                {/* Partition badges */}
+                <div className="space-y-1">
+                  <Label>Badges par partition</Label>
+                  <div className="flex flex-col gap-2">
+                    {Array.from({ length: Math.max(1, (selection.data.partitions ?? 1)) }).map((_, i) => {
+                      const idx = i;
+                      const value = (selection.data.partitionIcons || [])[idx] || '';
+                      // use shared popover state
+                      return (
+                        <div key={i} className="flex flex-col gap-1 p-2 rounded-md border bg-white/70 dark:bg-slate-900/50">
+                          <div className="flex items-center justify-between gap-2">
+                            <div className="flex items-center gap-2 min-w-0">
+                              <button type="button" aria-label="Effacer" title="Effacer" onClick={()=>{ const arr = Array.isArray(selection.data.partitionIcons) ? [...selection.data.partitionIcons] : []; arr[idx] = ''; onChange({ data: { partitionIcons: arr } }); }} className="h-6 w-6 rounded border text-[11px] flex items-center justify-center">✕</button>
+                              <div className="h-7 w-7 rounded-md border bg-white dark:bg-slate-800 flex items-center justify-center overflow-hidden">
+                                {value ? <img src={value} alt="" className="h-5 w-5 object-contain"/> : <span className="text-[10px] text-slate-400">—</span>}
+                              </div>
+                              <span className="text-[11px] text-slate-500 truncate">Partition {i+1}</span>
+                            </div>
+                            <div className="flex items-center gap-2 flex-shrink-0">
+                              <button type="button" title="Texte" aria-label="Texte" className="h-8 w-8 rounded-md border flex items-center justify-center" onClick={()=> { setOpenTextIndex(openTextIndex===idx?null:idx); }}>🅣</button>
+                              <button type="button" title="URL icône" aria-label="URL icône" className="h-8 w-8 rounded-md border flex items-center justify-center" onClick={()=> { setOpenUrlIndex(openUrlIndex===idx?null:idx); if(openUrlIndex!==idx){ setPickerQuery(''); setPickerPage(1);} }}>🔗</button>
+                              <button type="button" title="Parcourir" aria-label="Parcourir" className="h-8 w-8 rounded-md border flex items-center justify-center" onClick={()=> { setOpenPartitionPickerIndex(openPartitionPickerIndex === idx ? null : idx); setPickerQuery(''); setPickerPage(1); }}>🖼️</button>
+                            </div>
+                          </div>
+                          {openTextIndex === idx && (
+                            <div className="flex items-center gap-2">
+                              <Input className="h-8 text-xs w-full" placeholder="Texte du badge…" value={(selection.data.partitionBadgeTexts||[])[idx] || ''} onChange={(e)=>{
+                                const arr = Array.isArray(selection.data.partitionBadgeTexts) ? [...selection.data.partitionBadgeTexts] : [];
+                                arr[idx] = e.target.value;
+                                onChange({ data: { partitionBadgeTexts: arr } });
+                              }} />
+                              <button type="button" className="px-2 h-8 rounded-md border text-xs" onClick={()=>{ const arr = Array.isArray(selection.data.partitionBadgeTexts) ? [...selection.data.partitionBadgeTexts] : []; arr[idx] = ''; onChange({ data: { partitionBadgeTexts: arr } }); }}>Effacer</button>
+                            </div>
+                          )}
+                          {openUrlIndex === idx && (
+                            <div className="flex items-center gap-2">
+                              <Input className="h-8 text-xs w-full" placeholder="URL d’icône…" value={value} onChange={(e)=>{
+                                const arr = Array.isArray(selection.data.partitionIcons) ? [...selection.data.partitionIcons] : [];
+                                arr[idx] = e.target.value;
+                                onChange({ data: { partitionIcons: arr } });
+                              }} />
+                              <button type="button" className="px-2 h-8 rounded-md border text-xs" onClick={()=>{ const arr = Array.isArray(selection.data.partitionIcons) ? [...selection.data.partitionIcons] : []; arr[idx] = ''; onChange({ data: { partitionIcons: arr } }); }}>Effacer</button>
+                            </div>
+                          )}
+                          {openPartitionPickerIndex === idx && (
+                            <div className="mt-2 p-2 rounded-lg border bg-white dark:bg-slate-800 shadow-sm">
+                              <div className="flex items-center gap-2 mb-2">
+                                <Input className="h-9 text-xs" placeholder="Rechercher…" value={pickerQuery} onChange={(e)=>{ setPickerQuery(e.target.value); setPickerPage(1); }} />
+                                <div className="ml-auto flex items-center gap-2 text-[11px] text-slate-500">
+                                  <button type="button" disabled={pickerPage<=1} onClick={()=> setPickerPage(p=>Math.max(1,p-1))} className="px-2 h-8 rounded border disabled:opacity-40">‹</button>
+                                  <span>{pickerPage}/{totalPages}</span>
+                                  <button type="button" disabled={pickerPage>=totalPages} onClick={()=> setPickerPage(p=>Math.min(totalPages,p+1))} className="px-2 h-8 rounded border disabled:opacity-40">›</button>
+                                </div>
+                              </div>
+                              <div className="grid grid-cols-6 gap-2 max-h-48 overflow-auto pr-1">
+                                {currentItems.map(c => (
+                                  <button key={c.id} type="button" onClick={()=>{
+                                    const arr = Array.isArray(selection.data.partitionIcons) ? [...selection.data.partitionIcons] : [];
+                                    arr[idx] = c.icon;
+                                    onChange({ data: { partitionIcons: arr } });
+                                    setOpenPartitionPickerIndex(null);
+                                  }} className={`h-10 w-10 rounded-lg border ${value===c.icon?'ring-2 ring-blue-500 border-blue-400':'border-slate-200 dark:border-slate-600'} bg-white dark:bg-slate-800 flex items-center justify-center`}>
+                                    <img src={c.icon} alt="" className="h-5 w-5 object-contain" />
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
                 <div className="space-y-1">
                   <Label>Color</Label>
                   <Input type="color" className="h-9 w-10 p-1" value={selection.data.color || '#10b981'} onChange={(e)=> onChange({ data: { ...selection.data, color: e.target.value } })} />
@@ -154,6 +255,19 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
                 <div className="space-y-1">
                   <Label>Text color</Label>
                   <Input type="color" className="h-9 w-10 p-1" value={selection.data.textColor || autoTextColor(selection.data.color||'#10b981')} onChange={(e)=> onChange({ data: { ...selection.data, textColor: e.target.value } })} />
+                </div>
+                <div className="space-y-1">
+                  <Label>Partitions (vertical)</Label>
+                  <Input
+                    type="number"
+                    min={1}
+                    max={12}
+                    value={selection.data.partitions ?? 1}
+                    onChange={(e)=> {
+                      let v = parseInt(e.target.value,10); if (isNaN(v)) v = 1; v = Math.max(1, Math.min(12, v));
+                      onChange({ data: { ...selection.data, partitions: v } });
+                    }}
+                  />
                 </div>
                 <div className="pt-1 flex items-center gap-2">
                   <span className="text-[11px] text-slate-500 dark:text-slate-400">Header</span>
@@ -351,6 +465,85 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
                   <div className="grid grid-cols-2 gap-2">
                     <Input type="number" value={selection.data.width} onChange={(e) => onChange({ data: { ...selection.data, width: Number(e.target.value) || 0 } })} />
                     <Input type="number" value={selection.data.height} onChange={(e) => onChange({ data: { ...selection.data, height: Number(e.target.value) || 0 } })} />
+                  </div>
+                  <div className="space-y-1">
+                    <Label>Partitions (vertical)</Label>
+                    <Input type="number" min={1} max={12} value={selection.data.partitions ?? 1} onChange={(e)=>{
+                      let v = parseInt(e.target.value,10); if (isNaN(v)) v = 1; v = Math.max(1, Math.min(12, v));
+                      onChange({ data: { ...selection.data, partitions: v } });
+                    }} />
+                  </div>
+                  {/* Partition badges */}
+                  <div className="space-y-1">
+                    <Label>Badges par partition</Label>
+                    <div className="flex flex-col gap-2">
+                      {Array.from({ length: Math.max(1, (selection.data.partitions ?? 1)) }).map((_, i) => {
+                        const idx = i;
+                        const value = (selection.data.partitionIcons || [])[idx] || '';
+                          return (
+                          <div key={i} className="flex flex-col gap-1 p-2 rounded-md border bg-white/70 dark:bg-slate-900/50">
+                            <div className="flex items-center justify-between gap-2">
+                                <div className="flex items-center gap-2 min-w-0">
+                                  <button type="button" aria-label="Effacer" title="Effacer" onClick={()=>{ const arr = Array.isArray(selection.data.partitionIcons) ? [...selection.data.partitionIcons] : []; arr[idx] = ''; onChange({ data: { partitionIcons: arr } }); }} className="h-6 w-6 rounded border text-[11px] flex items-center justify-center">✕</button>
+                                <div className="h-7 w-7 rounded-md border bg-white dark:bg-slate-800 flex items-center justify-center overflow-hidden">
+                                  {value ? <img src={value} alt="" className="h-5 w-5 object-contain"/> : <span className="text-[10px] text-slate-400">—</span>}
+                                </div>
+                                  <span className="text-[11px] text-slate-500 truncate">Partition {i+1}</span>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                  <button type="button" title="Texte" aria-label="Texte" className="h-8 w-8 rounded-md border flex items-center justify-center" onClick={()=> { setOpenTextIndex(openTextIndex===idx?null:idx); }}>🅣</button>
+                                  <button type="button" title="URL icône" aria-label="URL icône" className="h-8 w-8 rounded-md border flex items-center justify-center" onClick={()=> { setOpenUrlIndex(openUrlIndex===idx?null:idx); if(openUrlIndex!==idx){ setPickerQuery(''); setPickerPage(1);} }}>🔗</button>
+                                  <button type="button" title="Parcourir" aria-label="Parcourir" className="h-8 w-8 rounded-md border flex items-center justify-center" onClick={()=> { setOpenPartitionPickerIndex(openPartitionPickerIndex === idx ? null : idx); setPickerQuery(''); setPickerPage(1); }}>🖼️</button>
+                              </div>
+                            </div>
+                              {openTextIndex === idx && (
+                                <div className="flex items-center gap-2 mt-1">
+                                  <Input className="h-8 text-xs w-full" placeholder="Texte du badge…" value={(selection.data.partitionBadgeTexts||[])[idx] || ''} onChange={(e)=>{
+                                    const arr = Array.isArray(selection.data.partitionBadgeTexts) ? [...selection.data.partitionBadgeTexts] : [];
+                                    arr[idx] = e.target.value;
+                                    onChange({ data: { partitionBadgeTexts: arr } });
+                                  }} />
+                                  <button type="button" className="px-2 h-8 rounded-md border text-xs" onClick={()=>{ const arr = Array.isArray(selection.data.partitionBadgeTexts) ? [...selection.data.partitionBadgeTexts] : []; arr[idx] = ''; onChange({ data: { partitionBadgeTexts: arr } }); }}>Effacer</button>
+                                </div>
+                              )}
+                              {openUrlIndex === idx && (
+                                <div className="flex items-center gap-2 mt-1">
+                                  <Input className="h-8 text-xs w-full" placeholder="URL d’icône…" value={value} onChange={(e)=>{
+                                    const arr = Array.isArray(selection.data.partitionIcons) ? [...selection.data.partitionIcons] : [];
+                                    arr[idx] = e.target.value;
+                                    onChange({ data: { partitionIcons: arr } });
+                                  }} />
+                                  <button type="button" className="px-2 h-8 rounded-md border text-xs" onClick={()=>{ const arr = Array.isArray(selection.data.partitionIcons) ? [...selection.data.partitionIcons] : []; arr[idx] = ''; onChange({ data: { partitionIcons: arr } }); }}>Effacer</button>
+                                </div>
+                              )}
+                              {openPartitionPickerIndex === idx && (
+                              <div className="mt-2 p-2 rounded-lg border bg-white dark:bg-slate-800 shadow-sm">
+                                <div className="flex items-center gap-2 mb-2">
+                                    <Input className="h-9 text-xs" placeholder="Rechercher…" value={pickerQuery} onChange={(e)=>{ setPickerQuery(e.target.value); setPickerPage(1); }} />
+                                    <div className="ml-auto flex items-center gap-2 text-[11px] text-slate-500">
+                                      <button type="button" disabled={pickerPage<=1} onClick={()=> setPickerPage(p=>Math.max(1,p-1))} className="px-2 h-8 rounded border disabled:opacity-40">‹</button>
+                                      <span>{pickerPage}/{totalPages}</span>
+                                      <button type="button" disabled={pickerPage>=totalPages} onClick={()=> setPickerPage(p=>Math.min(totalPages,p+1))} className="px-2 h-8 rounded border disabled:opacity-40">›</button>
+                                    </div>
+                                </div>
+                                  <div className="grid grid-cols-6 gap-2 max-h-48 overflow-auto pr-1">
+                                    {currentItems.map(c => (
+                                    <button key={c.id} type="button" onClick={()=>{
+                                      const arr = Array.isArray(selection.data.partitionIcons) ? [...selection.data.partitionIcons] : [];
+                                      arr[idx] = c.icon;
+                                        onChange({ data: { partitionIcons: arr } });
+                                        setOpenPartitionPickerIndex(null);
+                                    }} className={`h-10 w-10 rounded-lg border ${value===c.icon?'ring-2 ring-blue-500 border-blue-400':'border-slate-200 dark:border-slate-600'} bg-white dark:bg-slate-800 flex items-center justify-center`}>
+                                        <img src={c.icon} alt="" className="h-5 w-5 object-contain" />
+                                    </button>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
                   </div>
                   <div className="flex gap-2 pt-1">
                     <span className="text-[11px] text-slate-500 dark:text-slate-400">Header</span>

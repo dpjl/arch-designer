@@ -41,6 +41,9 @@ export interface ContainerNodeData {
   height?: number;
   children?: string[];
   autoLayout?: AutoLayoutConfig;
+  partitions?: number; // number of vertical partitions (default 1)
+  partitionIcons?: string[]; // per-partition badge icons (length = partitions)
+  partitionBadgeTexts?: string[]; // per-partition text labels shown next to the icon
 }
 
 export interface NetworkNodeData {
@@ -52,6 +55,9 @@ export interface NetworkNodeData {
   children?: string[];
   headerPos?: 'top' | 'left';
   autoLayout?: AutoLayoutConfig;
+  partitions?: number; // number of vertical partitions (default 1)
+  partitionIcons?: string[]; // per-partition badge icons (length = partitions)
+  partitionBadgeTexts?: string[]; // per-partition text labels shown next to the icon
 }
 
 export interface DoorNodeData extends BaseNodeData {
