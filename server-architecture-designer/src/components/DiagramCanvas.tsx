@@ -27,6 +27,7 @@ import ReactFlow, {
 } from "reactflow";
 import "reactflow/dist/style.css";
 import { Button } from "@/components/ui/button";
+import { useGroups } from '@/contexts/GroupsContext';
 import { Toolbar, PropertiesPanel, PalettePanel, ComponentNode, DoorNode, NetworkNode, NetworkLinkEdge, CustomEdge, MODES, GRID_SIZE, CONTAINER_HEADER_HEIGHT, NETWORK_HEADER_HEIGHT, DEFAULT_DOOR_WIDTH, DEFAULT_DOOR_HEIGHT, HISTORY_STORAGE_KEY, SNAP_STORAGE_KEY, hexToRgba, autoTextColor, isAncestor, updateNetworkLinksForService, isNetworkLink, useAutoLayout } from './diagram';
 import { AutoLayoutProvider, DEFAULT_GLOBAL_AUTO_LAYOUT } from '@/contexts/AutoLayoutContext';
 import { AutoLayoutConfig } from '@/types/diagram';
@@ -291,6 +292,7 @@ function DiagramCanvas({
   onUpdateGlobalAutoLayoutConfig: (config: AutoLayoutConfig) => void; 
 }) {
   const reactFlowWrapper = useRef<HTMLDivElement | null>(null);
+  const { groups, setGroups } = useGroups();
   const { project } = useReactFlow();
   const [mode, setMode] = useState<typeof MODES[keyof typeof MODES]>(MODES.EDIT);
   // History (refactored using hook) - will be initialized after nodes/edges state
@@ -1105,12 +1107,14 @@ function DiagramCanvas({
     localStorage.setItem("server-arch:nodes", JSON.stringify(nodes)); 
     localStorage.setItem("server-arch:edges", JSON.stringify(edges)); 
     localStorage.setItem("server-arch:global-config", JSON.stringify(globalAutoLayoutConfig));
-  }, [nodes, edges, globalAutoLayoutConfig]);
+    try { localStorage.setItem('server-arch:groups', JSON.stringify(groups)); } catch {}
+  }, [nodes, edges, globalAutoLayoutConfig, groups]);
   
   const onLoad = useCallback(() => { 
     const n = JSON.parse(localStorage.getItem("server-arch:nodes") || "null"); 
     const e = JSON.parse(localStorage.getItem("server-arch:edges") || "null"); 
     const g = JSON.parse(localStorage.getItem("server-arch:global-config") || "null");
+    const gr = JSON.parse(localStorage.getItem('server-arch:groups') || 'null');
     
     if (n && e) { 
       setNodes(n); 
@@ -1120,8 +1124,9 @@ function DiagramCanvas({
       if (g) {
         onUpdateGlobalAutoLayoutConfig({ ...DEFAULT_GLOBAL_AUTO_LAYOUT, ...g });
       }
+      if (Array.isArray(gr)) setGroups(gr);
     } 
-  }, [setNodes, setEdges, onUpdateGlobalAutoLayoutConfig]);
+  }, [setNodes, setEdges, onUpdateGlobalAutoLayoutConfig, setGroups]);
   const onClear = useCallback(() => { setNodes([]); setEdges([]); setSelection(null); historyRef.current = { past: [], present: { nodes: [], edges: [] }, future: [] }; lastCommitRef.current = Date.now(); try { localStorage.removeItem(HISTORY_STORAGE_KEY); } catch(_){} showFlash('Cleared'); }, [showFlash]);
 
   // Export
@@ -1161,11 +1166,12 @@ function DiagramCanvas({
     } catch (e) { console.error(e); }
   }, []);
 
-  // Export graph as JSON file (nodes + edges + global config)
+  // Export graph as JSON file (nodes + edges + groups + global config)
   const onExportJson = useCallback(() => {
     const payload = { 
       nodes, 
       edges, 
+      groups,
       globalAutoLayoutConfig 
     };
     const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
@@ -1177,9 +1183,9 @@ function DiagramCanvas({
     a.click();
     a.remove();
     URL.revokeObjectURL(url);
-  }, [nodes, edges, globalAutoLayoutConfig]);
+  }, [nodes, edges, groups, globalAutoLayoutConfig]);
 
-  // Import nodes+edges+global config JSON from file
+  // Import nodes+edges+groups+global config JSON from file
   const onImportJson = useCallback(() => {
     const input = document.createElement('input');
     input.type = 'file';
@@ -1189,14 +1195,16 @@ function DiagramCanvas({
       if (!file) return;
       try {
         const text = await file.text();
-        const data = JSON.parse(text);
-        const n = Array.isArray(data?.nodes) ? data.nodes : null;
-        const e = Array.isArray(data?.edges) ? data.edges : null;
+  const data = JSON.parse(text);
+  const n = Array.isArray(data?.nodes) ? data.nodes : null;
+  const e = Array.isArray(data?.edges) ? data.edges : null;
+  const gr = Array.isArray(data?.groups) ? data.groups : null;
         if (!n || !e) throw new Error('Invalid JSON: expected { nodes:[], edges:[] }');
         
         setNodes(n);
         setEdges(e);
         setSelection(null);
+  if (gr) setGroups(gr);
         
         // Charger les paramètres globaux s'ils existent
         if (data.globalAutoLayoutConfig) {
@@ -1214,7 +1222,7 @@ function DiagramCanvas({
       }
     };
     input.click();
-  }, [setNodes, setEdges, setSelection]);
+  }, [setNodes, setEdges, setSelection, setGroups]);
 
   // Drag from palette
   const onEntryDragStart = (event: DragEvent, entry: any) => {
