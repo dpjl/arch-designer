@@ -4,6 +4,7 @@ import React, { memo, useLayoutEffect, useRef, useState } from 'react';
 import { Handle, Position, useStore } from 'reactflow';
 import { Boxes, Lock, Unlock } from 'lucide-react';
 import { useTheme } from '../../theme/ThemeProvider';
+import { useGroups } from '@/contexts/GroupsContext';
 import { hexToRgba, autoTextColor } from '../diagram-helpers';
 import { effectiveBorderColor, effectiveBgColor, isAuto } from '../color-utils';
 
@@ -62,12 +63,32 @@ const ComponentNode = memo(({ id, data, selected, isConnectable }: ComponentNode
   const zoom = useStore((s) => s.transform[2]);
   const { resolvedTheme } = useTheme();
   const isDark = resolvedTheme === 'dark';
-  const { label = 'Component', icon, color, features = {}, bgColor, bgOpacity = 1, isContainer = false, width = 520, height = 320, locked = false, widthMode = 'fixed', customWidth } = data || {};
+  const { label = 'Component', icon, color, features = {}, bgColor, bgOpacity = 1, isContainer = false, width = 520, height = 320, locked = false, widthMode = 'fixed', customWidth, groupId } = data || {};
+  const { getById } = useGroups();
+  const group = groupId ? getById(groupId) : undefined;
   const autoRef = useRef<HTMLDivElement|null>(null);
   const [autoW, setAutoW] = useState<number>();
-  const borderColor = effectiveBorderColor(color, isDark);
-  const baseBg = effectiveBgColor(bgColor, isDark);
-  const bg = hexToRgba(baseBg, bgOpacity);
+  const effectiveColor = group?.color || color;
+  const effectiveBgBase = group?.color || bgColor;
+  // Darken a hex color by mixing with black by factor [0..1]
+  const darkenHex = (hex?: string, factor: number = 0.2) => {
+    if (!hex || typeof hex !== 'string') return hex || '#000000';
+    const m = hex.trim().match(/^#?([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/);
+    if (!m) return hex;
+    let s = m[1]; if (s.length === 3) s = s.split('').map(c=>c+c).join('');
+    const v = parseInt(s, 16);
+    let r=(v>>16)&255, g=(v>>8)&255, b=v&255;
+    r = Math.max(0, Math.min(255, Math.round(r * (1 - factor))));
+    g = Math.max(0, Math.min(255, Math.round(g * (1 - factor))));
+    b = Math.max(0, Math.min(255, Math.round(b * (1 - factor))));
+    const toHex = (n:number) => n.toString(16).padStart(2,'0');
+    return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
+  };
+  const baseBg = effectiveBgColor(effectiveBgBase, isDark);
+  // For grouped services, use solid background (no opacity) exactly as chosen; otherwise honor bgOpacity
+  const bg = group ? baseBg : hexToRgba(baseBg, bgOpacity);
+  // For grouped services, derive a slightly darker border from the group color for visual separation
+  const borderColor = group ? darkenHex(effectiveColor, 0.22) : effectiveBorderColor(effectiveColor, isDark);
   // Helper to mix two hex colors (returns hex). wb is weight of B in [0..1]
   const mixHex = (hexA?: string, hexB?: string, wb: number = 0.5) => {
     const parse = (h?: string): [number,number,number] | null => {
@@ -91,8 +112,8 @@ const ComponentNode = memo(({ id, data, selected, isConnectable }: ComponentNode
   // Previously: hide text when zoom < 0.6 (zoom threshold chosen to reduce clutter).
   // Requirement: always display the service label even at minimum zoom.
   const showText = true;
-  // dynamic label color if auto background
-  const labelColorClass = !isContainer && isAuto(bgColor) ? (isDark ? 'text-slate-100' : 'text-slate-800') : '';
+  // Dynamic label color based on resolved background (handles 'auto' and group overrides)
+  const labelFg = autoTextColor(baseBg || '#ffffff');
   const handleSize = 16;
   const showHandles = isContainer && selected && !locked;
 
@@ -315,7 +336,7 @@ const ComponentNode = memo(({ id, data, selected, isConnectable }: ComponentNode
         <Handle type="source" position={Position.Right} className={`handle-lg !bg-gray-500/80 transition-opacity ${selected ? 'opacity-100' : 'opacity-0'}`} isConnectable={isConnectable} />
   <div className={"flex items-center gap-2 min-w-0 transition-all " + (hasNetworks ? 'mt-1' : '')}>
           {icon ? <img src={icon} alt="" className="h-7 w-7 object-contain rounded" /> : <div className="h-7 w-7 rounded bg-gray-200 dark:bg-slate-600" />}
-          {showText && <div className={`font-medium text-sm truncate flex-1 ${labelColorClass} dark:text-slate-100`} title={label || 'Unnamed'}>{label || 'Unnamed'}</div>}
+          {showText && <div className="font-medium text-sm truncate flex-1" style={{ color: labelFg }} title={label || 'Unnamed'}>{label || 'Unnamed'}</div>}
           <span className="inline-block h-2 w-2 rounded-full flex-shrink-0" style={{ background: borderColor }} />
           <FeaturesIcons features={features} compact={!showText} />
         </div>

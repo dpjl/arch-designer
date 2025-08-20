@@ -5,9 +5,10 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Trash2 } from 'lucide-react';
+import { Trash2, Check } from 'lucide-react';
 import { CATALOG } from '@/lib/catalog';
 import { autoTextColor } from '@/lib/utils';
+import { useGroups } from '@/contexts/GroupsContext';
 import { isAuto } from './color-utils';
 import { AutoLayoutControls } from './AutoLayoutControls';
 import { AutoLayoutConfig } from '@/types/diagram';
@@ -66,11 +67,13 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
   globalAutoLayoutConfig 
 }) => {
   // Shared state for compact partition icon picker popover
+  const { groups, addGroup, updateGroup, removeGroup, pickSmartColor } = useGroups();
   const [openPartitionPickerIndex, setOpenPartitionPickerIndex] = React.useState<number | null>(null);
   const [pickerQuery, setPickerQuery] = React.useState('');
   const [pickerPage, setPickerPage] = React.useState(1);
   const [openTextIndex, setOpenTextIndex] = React.useState<number | null>(null);
   const [openUrlIndex, setOpenUrlIndex] = React.useState<number | null>(null);
+  const [openGroupPicker, setOpenGroupPicker] = React.useState(false);
   const pageSize = 24;
   const filteredCatalog = React.useMemo(() => {
     const q = pickerQuery.trim().toLowerCase();
@@ -82,6 +85,8 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
     const start = (pickerPage - 1) * pageSize;
     return filteredCatalog.slice(start, start + pageSize);
   }, [filteredCatalog, pickerPage]);
+  const [groupFilter, setGroupFilter] = React.useState('');
+  const filteredGroups = React.useMemo(() => groups.filter(g => g.label.toLowerCase().includes(groupFilter.toLowerCase())), [groups, groupFilter]);
   // Close pickers when selection changes
   React.useEffect(() => { setOpenPartitionPickerIndex(null); setOpenUrlIndex(null); setPickerQuery(''); setPickerPage(1); }, [selection?.id]);
   // Compute flags early (guarded) and keep all hooks above any early returns
@@ -298,6 +303,53 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
               <div className="space-y-1">
                 <Label>Label</Label>
                 <Input value={selection.data.label || ''} onChange={(e) => onChange({ data: { ...selection.data, label: e.target.value } })} />
+              </div>
+            )}
+            {/* Group assignment for service nodes (non-container) */}
+            {!isDoor && !isNetwork && !isContainer && (
+              <div className="mt-4">
+                <div className="flex items-center justify-between">
+                  <Label>Groupe</Label>
+                  <button type="button" aria-label="Choisir un groupe" title="Choisir un groupe" className="h-8 w-8 rounded-md border flex items-center justify-center" onClick={()=> setOpenGroupPicker(v=>!v)}>👥</button>
+                </div>
+                {selection.data.groupId && (
+                  <div className="mt-2 flex items-center gap-2 text-sm">
+                    <span className="inline-flex items-center gap-2 px-2 py-1 rounded-md border" style={{ background: (groups.find(g=>g.id===selection.data.groupId)?.color)||'#ffffff', color: autoTextColor(groups.find(g=>g.id===selection.data.groupId)?.color||'#ffffff'), borderColor: groups.find(g=>g.id===selection.data.groupId)?.color }}>
+                      {groups.find(g=>g.id===selection.data.groupId)?.label || '—'}
+                    </span>
+                    <button className="px-2 h-8 rounded-md border text-xs" onClick={()=> onChange({ data: { groupId: undefined } })}>Retirer</button>
+                  </div>
+                )}
+                {openGroupPicker && (
+                  <div className="mt-2 p-2 rounded-lg border bg-white dark:bg-slate-800 shadow-sm">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Input className="h-8 text-xs" placeholder="Rechercher groupe…" value={groupFilter} onChange={e=>setGroupFilter(e.target.value)} />
+                      <button type="button" className="px-2 h-8 rounded-md border text-xs" onClick={()=>{ addGroup('Groupe', pickSmartColor()); setGroupFilter(''); }}>+ Ajouter</button>
+                    </div>
+                    <div className="space-y-2 max-h-64 overflow-auto pr-1">
+                      {filteredGroups.map(g => (
+                        <div key={g.id} className="flex items-center justify-between gap-2 p-2 rounded-md border" style={{ borderColor: g.color }}>
+                          <div className="flex items-center gap-2 min-w-0">
+                            <span className="h-4 w-4 rounded-full border" style={{ background: g.color, borderColor: g.color }} />
+                            <Input className="h-8 text-xs w-40" value={g.label} onChange={(e)=> updateGroup(g.id, { label: e.target.value })} />
+                            <Input type="color" className="h-8 w-9 p-1" value={g.color} onChange={(e)=> updateGroup(g.id, { color: e.target.value })} />
+                          </div>
+                          <div className="flex items-center gap-1">
+                            <button type="button" title="Choisir" aria-label="Choisir" className="h-7 w-7 rounded-md border flex items-center justify-center" onClick={()=> onChange({ data: { groupId: g.id } })}>
+                              <Check className="h-3.5 w-3.5" />
+                            </button>
+                            <button type="button" title="Supprimer" aria-label="Supprimer" className="h-7 w-7 rounded-md border flex items-center justify-center" onClick={()=> removeGroup(g.id)}>
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                      {filteredGroups.length===0 && (
+                        <div className="text-[12px] text-slate-500">Aucun groupe. Cliquez sur “Ajouter”.</div>
+                      )}
+                    </div>
+                  </div>
+                )}
               </div>
             )}
             {!isDoor && !isNetwork && (

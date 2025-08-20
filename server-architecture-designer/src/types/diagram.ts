@@ -15,6 +15,7 @@ export interface ServiceNodeData extends BaseNodeData {
   features?: Record<string, any>;
   networks?: string[];
   primaryNetwork?: string;
+  groupId?: string; // when set, service uses group color for border & background
   instances?: Array<{
     id: string;
     auth?: string;
