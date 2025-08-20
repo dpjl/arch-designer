@@ -343,13 +343,19 @@ const ComponentNode = memo(({ id, data, selected, isConnectable }: ComponentNode
         {Array.isArray(data?.instances) && data.instances.length > 0 && (
           (() => {
             const list = data.instances as any[]; const MAX = 7; const shown = list.slice(0, MAX); const more = list.length - shown.length;
-            const short = (s?: string) => { const v = (s || 'inst').toString(); return v.length > 10 ? `${v.slice(0, 8)}…` : v; };
+            // resolve instance group colors/labels via global provider
+            let groupsMap: Record<string, { label: string; color: string }> = {};
+            try {
+              const ctx = (require('@/contexts/InstanceGroupsContext') as any);
+              // at runtime, we can't use hook here; rely on window injection fallback if provided
+              groupsMap = (window as any).__instanceGroupsMap || {};
+            } catch {}
             return (
               <div className="absolute top-0 left-2 right-2 z-[5] pointer-events-none transform -translate-y-full" data-instance-tabs>
                 <div className="flex items-end gap-1">
                   {shown.map((ins: any, i: number) => (
-                    <div key={i} className="pointer-events-none px-1.5 py-0.5 rounded-t-lg border border-b-0 text-[10px] shadow-sm max-w-[100px] flex items-center gap-0.5" style={{ borderColor, background: ins?.bgColor ? ins.bgColor : 'linear-gradient(to bottom, #ffffff, #f8fafc)', color: ins?.fgColor ? ins.fgColor : (ins?.bgColor ? autoTextColor(ins.bgColor) : '#111827') }}>
-                      <span className="font-mono truncate" style={{ maxWidth: '66px' }}>{short(ins?.id)}</span>
+                    <div key={i} className="pointer-events-none px-1.5 py-0.5 rounded-t-lg border border-b-0 text-[10px] shadow-sm max-w-[120px] flex items-center gap-1" style={{ borderColor, background: (groupsMap[ins?.groupId||'']?.color) || '#ffffff', color: autoTextColor(groupsMap[ins?.groupId||'']?.color || '#ffffff') }}>
+                      <span className="truncate" style={{ maxWidth: '80px' }}>{groupsMap[ins?.groupId||'']?.label || `#${i+1}`}</span>
                       {ins?.auth ? (<span className="inline-flex flex-col leading-[0.8] text-[9px]"><span>🔑</span>{ins.auth === 'auth2' && <span>🔑</span>}</span>) : null}
                     </div>
                   ))}

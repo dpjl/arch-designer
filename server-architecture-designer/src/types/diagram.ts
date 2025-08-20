@@ -17,10 +17,10 @@ export interface ServiceNodeData extends BaseNodeData {
   primaryNetwork?: string;
   groupId?: string; // when set, service uses group color for border & background
   instances?: Array<{
-    id: string;
-    auth?: string;
-    bgColor?: string;
-    fgColor?: string;
+  id: string;
+  auth?: string;
+  groupId: string; // reference to instance group
+  icon?: string; // optional icon for this instance
   }>;
   networkColors?: string[]; // derived
 }

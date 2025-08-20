@@ -12,6 +12,7 @@ import { useGroups } from '@/contexts/GroupsContext';
 import { isAuto } from './color-utils';
 import { AutoLayoutControls } from './AutoLayoutControls';
 import { AutoLayoutConfig } from '@/types/diagram';
+import { useInstanceGroups } from '@/contexts/InstanceGroupsContext';
 
 const DEFAULT_AUTO_LAYOUT: AutoLayoutConfig = {
   enabled: false,
@@ -68,6 +69,7 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
 }) => {
   // Shared state for compact partition icon picker popover
   const { groups, addGroup, updateGroup, removeGroup, pickSmartColor } = useGroups();
+  const { groups: instGroups, addGroup: addInstGroup, updateGroup: updateInstGroup, removeGroup: removeInstGroup, pickSmartColor: pickInstSmartColor } = useInstanceGroups();
   const [openPartitionPickerIndex, setOpenPartitionPickerIndex] = React.useState<number | null>(null);
   const [pickerQuery, setPickerQuery] = React.useState('');
   const [pickerPage, setPickerPage] = React.useState(1);
@@ -427,15 +429,29 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
                 <div className="space-y-2">
                   {(selection.data.instances || []).map((ins: any, idx: number) => {
                     const auth = ins?.auth as ('auth1'|'auth2'|undefined);
+                    const grp = instGroups.find(g => g.id === ins?.groupId);
                     return (
                       <div key={idx} className="p-2 rounded-md border bg-white dark:bg-slate-700/60 dark:border-slate-600 space-y-1.5">
                         <div className="flex items-center justify-between gap-2">
-                          <span className="text-[10px] uppercase tracking-wide text-slate-500">Instance ID</span>
+                          <span className="text-[10px] uppercase tracking-wide text-slate-500">Instance</span>
                           <span className="text-[10px] text-slate-400">#{idx+1}</span>
                         </div>
-                        <Input className="h-8 text-xs w-full" placeholder={`id-${idx+1}`} value={ins?.id || ''} onChange={(e)=>{
-                          const list = [...(selection.data.instances||[])]; list[idx] = { ...list[idx], id: e.target.value }; onChange({ data: { ...selection.data, instances: list } });
-                        }} />
+                        {/* Instance group selector (compact) */}
+                        <div className="flex items-center gap-2">
+                          <span className="text-[10px] text-muted-foreground">Groupe</span>
+                          <select className="flex-1 p-1 text-xs border rounded dark:bg-slate-700 dark:border-slate-600" value={ins?.groupId || ''} onChange={(e)=>{
+                            const gid = e.target.value || undefined;
+                            const list = [...(selection.data.instances||[])];
+                            list[idx] = { ...list[idx], groupId: gid as any } as any;
+                            onChange({ data: { ...selection.data, instances: list } });
+                          }}>
+                            <option value="">— choisir —</option>
+                            {instGroups.map(g => (<option key={g.id} value={g.id}>{g.label}</option>))}
+                          </select>
+                          <button type="button" className="h-7 px-2 rounded border text-[11px]" title="Ajouter groupe d’instances" onClick={()=>{ const g = addInstGroup('Groupe', pickInstSmartColor()); }}>
+                            +
+                          </button>
+                        </div>
                         <div className="flex items-center gap-2">
                           <div className="flex items-center gap-1">
                             <button type="button" title="No auth" onClick={()=>{ const list=[...(selection.data.instances||[])]; list[idx]={...list[idx], auth: undefined}; onChange({ data:{...selection.data, instances:list} }); }} className={`h-7 w-7 rounded-md border text-xs ${!auth ? 'ring-2 ring-slate-400 border-slate-300' : 'border-slate-200'}`}>—</button>
@@ -443,8 +459,10 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
                             <button type="button" title="Auth double" onClick={()=>{ const list=[...(selection.data.instances||[])]; list[idx]={...list[idx], auth:'auth2'}; onChange({ data:{...selection.data, instances:list} }); }} className={`h-7 w-7 rounded-md border text-[10px] leading-[0.8] ${auth==='auth2' ? 'ring-2 ring-blue-500 border-blue-400' : 'border-slate-200'}`}><span className="inline-flex flex-col" style={{ lineHeight: 0.8 }}><span>🔑</span><span>🔑</span></span></button>
                           </div>
                           <div className="ml-auto flex items-center gap-1">
-                            <Input type="color" className="h-7 w-8 p-0.5" value={ins?.bgColor || '#ffffff'} onChange={(e)=>{ const list=[...(selection.data.instances||[])]; const bg=e.target.value; const fg = ins?.fgColor || autoTextColor(bg); list[idx]={...list[idx], bgColor: bg, fgColor: fg}; onChange({ data:{...selection.data, instances:list} }); }} />
-                            <Input type="color" className="h-7 w-8 p-0.5" value={ins?.fgColor || autoTextColor(ins?.bgColor)} onChange={(e)=>{ const list=[...(selection.data.instances||[])]; list[idx]={...list[idx], fgColor: e.target.value}; onChange({ data:{...selection.data, instances:list} }); }} />
+                            {/* Aperçu (hérite du groupe) */}
+                            <div className="h-7 px-2 rounded-md border text-[11px] flex items-center gap-2" style={{ background: grp?.color || '#ffffff', color: autoTextColor(grp?.color || '#ffffff'), borderColor: grp?.color || '#e2e8f0' }}>
+                              <span className="truncate max-w-[140px]">{grp?.label || '—'}</span>
+                            </div>
                             <button type="button" onClick={()=>{ const list=[...(selection.data.instances||[])]; list.splice(idx,1); onChange({ data:{...selection.data, instances:list} }); }} className="h-7 px-2 rounded-md bg-slate-100 hover:bg-slate-200 border">✕</button>
                           </div>
                         </div>
@@ -453,7 +471,29 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
                   })}
                   <div className="flex items-center justify-between">
                     <div className="text-[11px] text-slate-500">Count: {(selection.data.instances||[]).length}</div>
-                    <Button size="sm" variant="outline" onClick={()=>{ const list=[...(selection.data.instances||[])]; list.push({ id: `inst-${list.length+1}` }); onChange({ data:{...selection.data, instances:list} }); }}>Add instance</Button>
+                    <Button size="sm" variant="outline" onClick={()=>{
+                      const gid = (instGroups[0]?.id) || addInstGroup('Groupe', pickInstSmartColor()).id;
+                      const list=[...(selection.data.instances||[])];
+                      list.push({ groupId: gid } as any);
+                      onChange({ data:{...selection.data, instances:list} });
+                    }}>Add instance from group</Button>
+                  </div>
+                  {/* Inline editor for instance groups (compact) */}
+                  <div className="mt-2 p-2 rounded border bg-white/70 dark:bg-slate-900/50">
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="text-[11px] text-slate-500">Groupes d’instances</span>
+                      <button type="button" className="ml-auto h-7 px-2 rounded-md border text-[11px]" onClick={()=> addInstGroup('Groupe', pickInstSmartColor())}>+ Ajouter</button>
+                    </div>
+                    <div className="space-y-1 max-h-40 overflow-auto pr-1">
+                      {instGroups.map(g => (
+                        <div key={g.id} className="flex items-center justify-between gap-2 p-1 rounded border" style={{ borderColor: g.color }}>
+                          <Input className="h-7 text-xs w-36" value={g.label} onChange={(e)=> updateInstGroup(g.id, { label: e.target.value })} />
+                          <Input type="color" className="h-7 w-8 p-0.5" value={g.color} onChange={(e)=> updateInstGroup(g.id, { color: e.target.value })} />
+                          <button type="button" className="h-7 w-7 rounded-md border" title="Supprimer" onClick={()=> removeInstGroup(g.id)}>✕</button>
+                        </div>
+                      ))}
+                      {instGroups.length===0 && <div className="text-[11px] text-slate-500">Aucun groupe. Ajoutez-en un.</div>}
+                    </div>
                   </div>
                 </div>
               </div>

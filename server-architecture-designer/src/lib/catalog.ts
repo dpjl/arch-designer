@@ -54,6 +54,8 @@ export const CATALOG: readonly CatalogEntry[] = [
   { id: 'door', label: 'Firewall Door', icon: "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><defs><linearGradient id='wood' x1='0' x2='0' y1='0' y2='1'><stop offset='0%' stop-color='%23d97706'/><stop offset='100%' stop-color='%238b5e34'/></linearGradient><linearGradient id='frame' x1='0' x2='0' y1='0' y2='1'><stop offset='0%' stop-color='%23f1f5f9'/><stop offset='100%' stop-color='%23cbd5e1'/></linearGradient></defs><rect x='10' y='6' width='44' height='52' rx='4' fill='url(%23frame)' stroke='%23474f5a' stroke-width='3'/><rect x='18' y='12' width='28' height='40' rx='2' fill='url(%23wood)' stroke='%23474f5a' stroke-width='2'/><circle cx='40' cy='32' r='3.2' fill='%23f8fafc' stroke='%23474f5a' stroke-width='1.5'/><path d='M18 28h28M18 36h28' stroke='%23474f5a' stroke-width='1.5' opacity='.35'/><path d='M12 58h40' stroke='%23b91c1c' stroke-width='4' stroke-linecap='round' opacity='.6'/></svg>", color: '#B45309', category: 'security' },
   // Group container
   { id: 'group', label: 'Container (Group)', icon: "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='64' height='64'><rect x='6' y='14' width='52' height='36' rx='8' ry='8' fill='%23ffffff' stroke='%23475569' stroke-width='4'/><rect x='6' y='14' width='52' height='10' rx='8' ry='8' fill='%23e2e8f0' stroke='%23cbd5e1' stroke-width='0'/><circle cx='14' cy='19' r='2' fill='%2394a3b8'/><rect x='20' y='17' width='24' height='4' rx='2' fill='%23475569'/></svg>", color: '#475569', category: 'container' },
+  // Backup
+  { id: 'borgbackup', label: 'Borg Backup', icon: SI('borgbackup'), color: '#00A35C', category: 'service' },
 ] as const;
 
 export type CatalogId = (typeof CATALOG)[number]['id'];
