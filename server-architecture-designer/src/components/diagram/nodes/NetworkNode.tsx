@@ -2,7 +2,7 @@
 import React, { memo } from 'react';
 import { Handle, Position } from 'reactflow';
 import { CONTAINER_HEADER_HEIGHT, NETWORK_HEADER_HEIGHT, GRID_SIZE } from '../constants';
-import { hexToRgba } from '../diagram-helpers';
+import { hexToRgba, autoTextColor } from '../diagram-helpers';
 
 interface NetworkNodeProps { id: string; data: any; selected: boolean; isConnectable: boolean; }
 
@@ -11,6 +11,25 @@ const NetworkNode = memo(({ id, data, selected, isConnectable }: NetworkNodeProp
   const partitions = Math.max(1, Math.min(12, parseInt(String(data?.partitions ?? 1), 10) || 1));
   const text = textColor || '#0f172a';
   const bgTint = hexToRgba(color || '#10b981', 0.08);
+  const mixHex = (hexA?: string, hexB?: string, wb: number = 0.5) => {
+    const parse = (h?: string): [number,number,number] | null => {
+      if (!h || typeof h !== 'string') return null;
+      const m = h.trim().match(/^#?([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/);
+      if (!m) return null;
+      let s = m[1];
+      if (s.length === 3) s = s.split('').map(c=>c+c).join('');
+      const v = parseInt(s, 16);
+      return [(v>>16)&255, (v>>8)&255, v&255];
+    };
+    const a = parse(hexA) || [255,255,255];
+    const b = parse(hexB) || [255,255,255];
+    const wa = Math.max(0, Math.min(1, 1 - wb));
+    const r = Math.round(a[0]*wa + b[0]*wb);
+    const g = Math.round(a[1]*wa + b[1]*wb);
+    const b2 = Math.round(a[2]*wa + b[2]*wb);
+    const toHex = (n:number) => n.toString(16).padStart(2,'0');
+    return `#${toHex(r)}${toHex(g)}${toHex(b2)}`;
+  };
   const handleSize = 16;
   const showHandles = selected;
   const startResize = (e: React.MouseEvent, dir: string) => {
@@ -132,16 +151,14 @@ const NetworkNode = memo(({ id, data, selected, isConnectable }: NetworkNodeProp
               const txt = Array.isArray((data as any)?.partitionBadgeTexts) ? (data as any).partitionBadgeTexts[i] : undefined;
               return (
         <div key={`badge-${i}`} className="absolute" style={{ left, top: 10, transform:'translate(-50%, -50%)' }}>
-                  {(url || txt) ? (
-          <div className="max-w-[160px] rounded-xl shadow border overflow-hidden" style={{ borderColor: color, background: `color-mix(in srgb, ${color} 20%, #ffffff 80%)` }}>
+                  {(url || txt) ? (() => { const badgeBg = mixHex(color, '#ffffff', 0.8); const badgeFg = autoTextColor(badgeBg); return (
+                    <div className="max-w-[160px] rounded-xl shadow border overflow-hidden" style={{ borderColor: color, background: badgeBg }}>
                       <div className="px-2 h-8 inline-flex items-center gap-1 whitespace-nowrap">
                         {url && <img src={url} alt="" className="h-5 w-5 object-contain" />}
-                        {txt && <span className="text-xs font-semibold text-slate-700 dark:text-slate-100 truncate max-w-[130px]" style={{ fontVariant:'small-caps', letterSpacing: '0.3px' }}>{txt}</span>}
+                        {txt && <span className="text-xs font-semibold truncate max-w-[130px]" style={{ color: badgeFg, fontVariant:'small-caps', letterSpacing: '0.3px' }}>{txt}</span>}
                       </div>
                     </div>
-                  ) : (
-                    <div className="h-1.5 w-1.5 rounded-full" style={{ background: color, opacity: 0.7 }} />
-                  )}
+                  ); })() : null}
                 </div>
               );
             })}

@@ -68,6 +68,26 @@ const ComponentNode = memo(({ id, data, selected, isConnectable }: ComponentNode
   const borderColor = effectiveBorderColor(color, isDark);
   const baseBg = effectiveBgColor(bgColor, isDark);
   const bg = hexToRgba(baseBg, bgOpacity);
+  // Helper to mix two hex colors (returns hex). wb is weight of B in [0..1]
+  const mixHex = (hexA?: string, hexB?: string, wb: number = 0.5) => {
+    const parse = (h?: string): [number,number,number] | null => {
+      if (!h || typeof h !== 'string') return null;
+      const m = h.trim().match(/^#?([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/);
+      if (!m) return null;
+      let s = m[1];
+      if (s.length === 3) s = s.split('').map(c=>c+c).join('');
+      const v = parseInt(s, 16);
+      return [(v>>16)&255, (v>>8)&255, v&255];
+    };
+    const a = parse(hexA) || [255,255,255];
+    const b = parse(hexB) || [255,255,255];
+    const wa = Math.max(0, Math.min(1, 1 - wb));
+    const r = Math.round(a[0]*wa + b[0]*wb);
+    const g = Math.round(a[1]*wa + b[1]*wb);
+    const b2 = Math.round(a[2]*wa + b[2]*wb);
+    const toHex = (n:number) => n.toString(16).padStart(2,'0');
+    return `#${toHex(r)}${toHex(g)}${toHex(b2)}`;
+  };
   // Previously: hide text when zoom < 0.6 (zoom threshold chosen to reduce clutter).
   // Requirement: always display the service label even at minimum zoom.
   const showText = true;
@@ -189,16 +209,14 @@ const ComponentNode = memo(({ id, data, selected, isConnectable }: ComponentNode
                 const txt = Array.isArray((data as any)?.partitionBadgeTexts) ? (data as any).partitionBadgeTexts[i] : undefined;
                 return (
                   <div key={`badge-${i}`} className="absolute" style={{ left, top: headerPos==='top'?CONTAINER_HEADER_HEIGHT:10, transform:'translate(-50%, -50%)' }}>
-                    {(url || txt) ? (
-                      <div className="max-w-[160px] rounded-xl shadow border overflow-hidden" style={{ borderColor: borderColor, background: `color-mix(in srgb, ${baseBg} 70%, #ffffff 30%)`, backdropFilter:'saturate(1.1) blur(1px)' }}>
+                    {(url || txt) ? (() => { const badgeBg = mixHex(baseBg, '#ffffff', 0.3); const badgeFg = autoTextColor(badgeBg); return (
+                      <div className="max-w-[160px] rounded-xl shadow border overflow-hidden" style={{ borderColor: borderColor, background: badgeBg, backdropFilter:'saturate(1.1) blur(1px)' }}>
                         <div className="px-2 h-8 inline-flex items-center gap-1 whitespace-nowrap">
                           {url && <img src={url} alt="" className="h-5 w-5 object-contain" />}
-                          {txt && <span className="text-xs font-semibold text-slate-700 dark:text-slate-100 truncate max-w-[130px]" style={{ fontVariant:'small-caps', letterSpacing: '0.3px' }}>{txt}</span>}
+                          {txt && <span className="text-xs font-semibold truncate max-w-[130px]" style={{ color: badgeFg, fontVariant:'small-caps', letterSpacing: '0.3px' }}>{txt}</span>}
                         </div>
                       </div>
-                    ) : (
-                      <div className="h-1.5 w-1.5 rounded-full" style={{ background: borderColor, opacity: 0.7 }} />
-                    )}
+                    ); })() : null}
                   </div>
                 );
               })}
