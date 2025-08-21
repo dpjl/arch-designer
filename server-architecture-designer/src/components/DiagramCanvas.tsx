@@ -291,7 +291,7 @@ function DiagramCanvas({
   
   const { historyRef, lastCommitRef, commitIfChanged, undo, redo } = useDiagramHistory(setNodes, setEdges, showFlash);
   useEffect(()=>{ (window as any).__showFlash = showFlash; },[showFlash]);
-  const { selection, setSelection, selectNode } = useDiagramSelection({ setNodes, setEdges, showFlash, enableKeyboardDelete: true, getNodes: () => nodes, getEdges: () => edges });
+  const { selection, setSelection, selectNode } = useDiagramSelection({ setNodes, setEdges, showFlash, enableKeyboardDelete: mode === MODES.EDIT, getNodes: () => nodes, getEdges: () => edges });
   const { applyAutoLayout, isNodeLocked } = useAutoLayout(globalAutoLayoutConfig);
   
   const [isDark, setIsDark] = useState(false);
@@ -649,6 +649,7 @@ function DiagramCanvas({
 
   // DnD handlers
   const onDrop = useCallback((event: DragEvent) => {
+    if (mode !== MODES.EDIT) { event.preventDefault(); return; }
     event.preventDefault();
     const bounds = reactFlowWrapper.current!.getBoundingClientRect();
     const id = (event.dataTransfer as DataTransfer).getData("application/x-id");
@@ -707,11 +708,12 @@ function DiagramCanvas({
     }
     const newNode = { id: nid, type: "component", position, data, parentNode: (parent as any)?.id, extent: parent ? ("parent" as const) : undefined };
     setNodes((nds) => nds.concat([newNode]));
-  }, [setNodes, findContainerAt]);
+  }, [setNodes, findContainerAt, mode]);
 
-  const onDragOver = useCallback((event: DragEvent) => { event.preventDefault(); (event.dataTransfer as DataTransfer).dropEffect = "move"; }, []);
+  const onDragOver = useCallback((event: DragEvent) => { event.preventDefault(); (event.dataTransfer as DataTransfer).dropEffect = mode === MODES.EDIT ? "move" : "none"; }, [mode]);
 
   const onNodeDragStop = useCallback((_: any, node: any) => {
+    if (mode !== MODES.EDIT) return;
     // Re-parent both services and containers, but avoid cycles
   const parentNode = node.parentNode ? nodes.find((n) => n.id === node.parentNode) : null;
   const parentAbs = parentNode ? absoluteOf(parentNode) : { x: 0, y: 0 };
@@ -767,14 +769,14 @@ function DiagramCanvas({
       if (n.parentNode) return { ...n, parentNode: undefined, extent: undefined };
       return n;
     }));
-  }, [findContainerAt, nodes, setNodes]);
+  }, [findContainerAt, nodes, setNodes, mode]);
 
   // Selection / connect
   const onNodeClick = useCallback((evt: any, node: any) => {
     if (mode === MODES.EDIT) selectNode(node);
   }, [mode, selectNode]);
 
-  const onEdgeClick = useCallback((_: any, edge: any) => { if (mode === MODES.EDIT) setSelection({ ...edge, type: "edge" }); }, [mode]);
+  const onEdgeClick = useCallback((_: any, edge: any) => { if (mode === MODES.EDIT) setSelection({ ...edge, type: "edge" }); }, [mode, setSelection]);
 
   const updateSelection = useCallback((patch: any) => {
     if (!selection) return;
@@ -1061,8 +1063,8 @@ function DiagramCanvas({
     setSelection(null);
   }, [selection, setEdges, setSelection]);
 
-  const onNodeDoubleClick = useCallback((_: any, node: any) => { if (mode !== MODES.EDIT) return; const label = prompt("Label", node.data?.label || ""); if (label !== null) setNodes((nds) => nds.map((n) => (n.id === node.id ? { ...n, data: { ...n.data, label } } : n))); }, [mode]);
-  const onEdgeDoubleClick = useCallback((_: any, edge: any) => { if (mode !== MODES.EDIT) return; const label = prompt("Label", edge.label || ""); if (label !== null) setEdges((eds) => eds.map((e) => (e.id === edge.id ? { ...e, label } : e))); }, [mode]);
+  const onNodeDoubleClick = useCallback((_: any, node: any) => { if (mode !== MODES.EDIT) return; const label = prompt("Label", node.data?.label || ""); if (label !== null) setNodes((nds) => nds.map((n) => (n.id === node.id ? { ...n, data: { ...n.data, label } } : n))); }, [mode, setNodes]);
+  const onEdgeDoubleClick = useCallback((_: any, edge: any) => { if (mode !== MODES.EDIT) return; const label = prompt("Label", edge.label || ""); if (label !== null) setEdges((eds) => eds.map((e) => (e.id === edge.id ? { ...e, label } : e))); }, [mode, setEdges]);
 
   // Persistence
   const onSave = useCallback(() => { 
@@ -1373,6 +1375,7 @@ function DiagramCanvas({
   };
 
   const onNodeDragStart = useCallback((evt: any, node: any) => {
+  if (mode !== MODES.EDIT) { evt.stopPropagation(); return; }
   if (document.body.classList.contains('resizing-container')) { evt.stopImmediatePropagation?.(); evt.stopPropagation(); return false; }
   
     // Bloquer le mouvement si l'auto-layout est activé pour ce nœud
@@ -1392,7 +1395,7 @@ function DiagramCanvas({
       }));
       setSelection((s: any) => (s && s.id === node.id ? { ...s, parentNode: undefined, extent: undefined } : s));
     }
-  }, [setNodes, isNodeLocked, nodes]);
+  }, [setNodes, isNodeLocked, nodes, mode]);
   // Multi-drag state and handlers
   const dragBundleRef = useRef<{
     baseId: string;
@@ -1481,6 +1484,7 @@ function DiagramCanvas({
     dragBundleRef.current = { baseId: node.id, parentId, start, partIndex, headerLeft, partitions, partitionWidth, containerWidth };
   }, [nodes]);
   const onNodeDrag = useCallback((evt: any, node: any) => {
+    if (mode !== MODES.EDIT) return;
     const ref = dragBundleRef.current; if (!ref) return;
     const baseStart = ref.start[node.id]; if (!baseStart) return;
     const dx = node.position.x - baseStart.x; const dy = node.position.y - baseStart.y;
@@ -1510,10 +1514,45 @@ function DiagramCanvas({
       }
       return { ...n, position: { x: newX, y: newY }, data: { ...(n as any).data, parentPartition: ref.partIndex?.[n.id] ?? (n as any).data?.parentPartition } } as any;
     }));
-  }, [setNodes]);
+  }, [setNodes, mode]);
   const onNodeDragStopMulti = useCallback(() => { dragBundleRef.current = null; }, []);
 
+  // Clear selection and enforce read-only when switching to view mode
+  useEffect(() => {
+    if (mode === MODES.VIEW) {
+      setSelection(null);
+    }
+  }, [mode, setSelection]);
+
   const viewLocked = mode === MODES.VIEW;
+  const [isPanning, setIsPanning] = useState(false);
+  const panLastRef = useRef<{x:number;y:number}|null>(null);
+  const onWrapperMouseDown = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+    if (!viewLocked) return;
+    // Left button only
+    if (e.button !== 0) return;
+    e.preventDefault();
+    e.stopPropagation();
+    panLastRef.current = { x: e.clientX, y: e.clientY };
+    setIsPanning(true);
+    const move = (ev: MouseEvent) => {
+      const last = panLastRef.current; if (!last) return;
+      const dx = ev.clientX - last.x; const dy = ev.clientY - last.y;
+      panLastRef.current = { x: ev.clientX, y: ev.clientY };
+      try {
+        const vp = getViewport();
+        setViewport({ x: vp.x + dx, y: vp.y + dy, zoom: vp.zoom });
+      } catch {}
+    };
+    const up = () => {
+      setIsPanning(false);
+      panLastRef.current = null;
+      window.removeEventListener('mousemove', move);
+      window.removeEventListener('mouseup', up);
+    };
+    window.addEventListener('mousemove', move);
+    window.addEventListener('mouseup', up);
+  }, [viewLocked, getViewport, setViewport]);
   const [showLeftPanel, setShowLeftPanel] = useState(true);
   const [showRightPanel, setShowRightPanel] = useState(true);
   // Hydration note: ne pas lire localStorage dans l'initialisation useState
@@ -1612,13 +1651,17 @@ function DiagramCanvas({
           <div className="flex-1 min-w-0 relative">
       <Card className="rounded-2xl h-full bg-white/80 dark:bg-slate-900/55 backdrop-blur border border-slate-200 dark:border-slate-700 dark:shadow-[0_0_0_1px_rgba(255,255,255,0.04)]">
               <CardContent className="h-full p-0">
-        <div ref={reactFlowWrapper} className={`h-full ${viewLocked ? "pointer-events-auto" : ""} reactflow-surface dark:[&_.react-flow__attribution]:bg-transparent`}>
+        <div
+          ref={reactFlowWrapper}
+          onMouseDownCapture={onWrapperMouseDown}
+          className={`h-full ${viewLocked ? "cursor-" + (isPanning ? "grabbing" : "grab") : ""} reactflow-surface dark:[&_.react-flow__attribution]:bg-transparent`}
+        >
                   <ReactFlow
                     nodes={nodes}
                     edges={edges}
-                    onNodesChange={onNodesChange}
-                    onEdgesChange={onEdgesChange}
-                    onConnect={onConnect}
+                    onNodesChange={(changes)=>{ if (mode === MODES.EDIT) onNodesChange(changes); }}
+                    onEdgesChange={(changes)=>{ if (mode === MODES.EDIT) onEdgesChange(changes); }}
+                    onConnect={(params)=>{ if (mode === MODES.EDIT) onConnect(params); }}
                     onDrop={onDrop as any}
                     onDragOver={onDragOver as any}
                     nodeTypes={nodeTypes as any}
@@ -1632,6 +1675,10 @@ function DiagramCanvas({
                     onNodeDrag={onNodeDrag}
                     connectionMode={ConnectionMode.Loose}
                     connectionLineType={ConnectionLineType.Straight}
+                    nodesDraggable={mode === MODES.EDIT}
+                    nodesConnectable={mode === MODES.EDIT}
+                    elementsSelectable={mode === MODES.EDIT}
+                    selectNodesOnDrag={mode === MODES.EDIT}
                     defaultEdgeOptions={{
                       type: 'default',
                       style: { strokeWidth: 2, stroke: '#64748b' },
@@ -1639,14 +1686,13 @@ function DiagramCanvas({
                     }}
                     snapToGrid={snapEnabled}
                     snapGrid={[GRID, GRID]}
-                    elementsSelectable
-                    selectNodesOnDrag
-                    nodesConnectable
                     fitView
                   >
                     <MiniMap pannable zoomable className="!rounded-xl !bg-white/80 dark:!bg-slate-800/65 !backdrop-blur !border border-slate-200/60 dark:!border-slate-600/60" nodeStrokeWidth={1} nodeColor={miniMapNodeColorFn} />
                     <Controls showInteractive={false} className="!rounded-xl" />
-                    <Background variant={BackgroundVariant.Lines} gap={24} color={isDark ? '#18222b' : '#e2e8f0'} size={1} />
+                    {mode === MODES.EDIT && (
+                      <Background variant={BackgroundVariant.Lines} gap={24} color={isDark ? '#18222b' : '#e2e8f0'} size={1} />
+                    )}
                   </ReactFlow>
                 </div>
               </CardContent>

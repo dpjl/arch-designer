@@ -371,6 +371,16 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
                 <span className="text-xs">Mode container</span>
               </div>
             )}
+            {/* Compact mode: only for service nodes (non-container, non-network, non-door) */}
+            {!isDoor && !isNetwork && !selection.data?.isContainer && (
+              <div className="flex items-center gap-2 pt-1">
+                <Checkbox
+                  checked={!!selection.data.compact}
+                  onCheckedChange={(v) => onChange({ data: { ...selection.data, compact: !!v } })}
+                />
+                <span className="text-xs">Mode compact</span>
+              </div>
+            )}
             {!isDoor && !isNetwork && (
               <div className="space-y-1">
                 <SectionTitle>Couleurs</SectionTitle>

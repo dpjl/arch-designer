@@ -63,7 +63,8 @@ const ComponentNode = memo(({ id, data, selected, isConnectable }: ComponentNode
   const zoom = useStore((s) => s.transform[2]);
   const { resolvedTheme } = useTheme();
   const isDark = resolvedTheme === 'dark';
-  const { label = 'Component', icon, color, features = {}, bgColor, bgOpacity = 1, isContainer = false, width = 520, height = 320, locked = false, widthMode = 'fixed', customWidth, groupId } = data || {};
+  const { label = 'Component', icon, color, features = {}, bgColor, bgOpacity = 1, isContainer = false, width = 520, height = 320, locked = false, widthMode = 'fixed', customWidth, groupId, compact: compactFlag } = data || {};
+  const isCompact = !!compactFlag;
   const { getById } = useGroups();
   const group = groupId ? getById(groupId) : undefined;
   const autoRef = useRef<HTMLDivElement|null>(null);
@@ -320,7 +321,7 @@ const ComponentNode = memo(({ id, data, selected, isConnectable }: ComponentNode
     return (
   <div ref={autoRef} className={"flex items-stretch gap-2 transition " + (widthMode==='auto' ? '' : '')}>
         {/* Service card */}
-  <div ref={serviceRef} className="group rounded-2xl shadow-lg px-2 pt-1 pb-1 hover:shadow-xl transition overflow-visible border relative dark:shadow-slate-950/40" style={{ borderColor, background: bg, width: serviceWidth, zIndex: 200 }}>
+  <div ref={serviceRef} className={`group rounded-2xl shadow-lg ${isCompact ? 'px-2 py-0.5' : 'px-2 pt-1 pb-1'} hover:shadow-xl transition overflow-visible border relative dark:shadow-slate-950/40`} style={{ borderColor, background: bg, width: serviceWidth, zIndex: 200, minHeight: isCompact ? 30 : undefined }}>
         {hasNetworks && (
           <div className="pointer-events-none absolute h-1.5 flex overflow-hidden"
                style={{ top:0, left:4, right:4, borderTopLeftRadius:'calc(1rem - 4px)', borderTopRightRadius:'calc(1rem - 4px)', clipPath:'inset(0 0 0 0 round calc(1rem - 4px) calc(1rem - 4px) 0 0)' }}>
@@ -333,11 +334,13 @@ const ComponentNode = memo(({ id, data, selected, isConnectable }: ComponentNode
         <Handle type="source" position={Position.Bottom} className={`handle-lg !bg-gray-500/80 transition-opacity ${selected ? 'opacity-100' : 'opacity-0'}`} isConnectable={isConnectable} />
         <Handle type="target" position={Position.Left} className={`handle-lg !bg-gray-500/80 transition-opacity ${selected ? 'opacity-100' : 'opacity-0'}`} isConnectable={isConnectable} />
         <Handle type="source" position={Position.Right} className={`handle-lg !bg-gray-500/80 transition-opacity ${selected ? 'opacity-100' : 'opacity-0'}`} isConnectable={isConnectable} />
-  <div className={"flex items-center gap-2 min-w-0 transition-all " + (hasNetworks ? 'mt-1' : '')}>
-          {icon ? <img src={icon} alt="" className="h-7 w-7 object-contain rounded" /> : <div className="h-7 w-7 rounded bg-gray-200 dark:bg-slate-600" />}
-          {showText && <div className="font-medium text-sm truncate flex-1" style={{ color: labelFg }} title={label || 'Unnamed'}>{label || 'Unnamed'}</div>}
+  <div className={"flex items-center gap-2 min-w-0 transition-all " + (
+            isCompact ? (hasNetworks ? 'mt-[4px]' : 'mt-[2px]') : (hasNetworks ? 'mt-1' : '')
+          )} style={isCompact?{minHeight:18, alignItems:'center'}:undefined}>
+          {icon ? <img src={icon} alt="" className={(isCompact? 'h-4.5 w-4.5' : 'h-7 w-7') + " object-contain rounded"} /> : <div className={(isCompact? 'h-4.5 w-4.5' : 'h-7 w-7') + " rounded bg-gray-200 dark:bg-slate-600"} />}
+          {showText && <div className={(isCompact? 'text-[11px]' : 'text-sm') + " font-medium truncate flex-1 leading-tight"} style={{ color: labelFg }} title={label || 'Unnamed'}>{label || 'Unnamed'}</div>}
           <span className="inline-block h-2 w-2 rounded-full flex-shrink-0" style={{ background: borderColor }} />
-          <FeaturesIcons features={features} compact={!showText} />
+          <FeaturesIcons features={features} compact={isCompact} />
         </div>
         </div>
         {/* Instances as vertical rectangles on the right */}
@@ -347,7 +350,7 @@ const ComponentNode = memo(({ id, data, selected, isConnectable }: ComponentNode
             const groupsMap: Record<string, { label: string; color: string }> = (window as any).__instanceGroupsMap || {};
             const useServiceColor = !!data?.useServiceColorForInstances;
             return (
-              <div className="relative flex items-stretch" style={{ minWidth: '28px', marginLeft: '-20px' }}>
+              <div className="relative flex items-stretch" style={{ minWidth: isCompact ? '22px' : '28px', marginLeft: isCompact ? '-16px' : '-20px' }}>
                 {list.map((ins:any, i:number) => {
                   const grp = groupsMap[ins?.groupId||''];
                   let bgCol;
@@ -361,21 +364,21 @@ const ComponentNode = memo(({ id, data, selected, isConnectable }: ComponentNode
                   const fgCol = autoTextColor(bgCol);
                   const isDouble = ins?.auth === 'auth2';
                   return (
-                    <div key={i} className="absolute top-0 bottom-0 rounded-2xl border shadow-sm flex flex-col items-end justify-end px-1 pt-0.5 pb-0.5" style={{ borderColor, background: bgCol, left: `${i*16}px`, minWidth: '28px', maxWidth: '100px', zIndex: 150 - i }}>
+                    <div key={i} className="absolute top-0 bottom-0 rounded-2xl border shadow-sm flex flex-col items-end justify-end px-1 pt-0.5 pb-0.5" style={{ borderColor, background: bgCol, left: `${i*(isCompact?12:16)}px`, minWidth: isCompact? '22px':'28px', maxWidth: '100px', zIndex: 150 - i }}>
                       <div className="w-full flex flex-col items-end justify-end">
                         {ins?.auth && (
                           isDouble ? (
                             <span className="inline-flex flex-col items-end justify-end mb-0.5" style={{marginRight: '-1px'}}>
-                              <Key className="h-3 w-3" strokeWidth={2.1} />
-                              <Key className="h-2.5 w-2.5 -mt-1" strokeWidth={2.1} />
+                              <Key className={isCompact?"h-2.5 w-2.5":"h-3 w-3"} strokeWidth={2.1} />
+                              <Key className={isCompact?"h-2 w-2 -mt-0.5":"h-2.5 w-2.5 -mt-1"} strokeWidth={2.1} />
                             </span>
                           ) : (
                             <span className="inline-flex items-end justify-end mb-1" style={{marginRight: '-1px'}}>
-                              <Key className="h-3 w-3" strokeWidth={2.1} />
+                              <Key className={isCompact?"h-2.5 w-2.5":"h-3 w-3"} strokeWidth={2.1} />
                             </span>
                           )
                         )}
-                        <span className="text-[10px] font-medium text-right truncate w-full leading-tight" style={{ color: fgCol, fontVariant: 'small-caps', letterSpacing: '0.3px' }} title={grp?.label || ''}>{grp?.label || ''}</span>
+                        <span className={(isCompact?"text-[9px]":"text-[10px]") + " font-medium text-right truncate w-full leading-tight"} style={{ color: fgCol, fontVariant: 'small-caps', letterSpacing: '0.3px' }} title={grp?.label || ''}>{grp?.label || ''}</span>
                       </div>
                     </div>
                   );

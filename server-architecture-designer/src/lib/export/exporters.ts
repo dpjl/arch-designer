@@ -69,17 +69,25 @@ export async function exportFullDiagram(viewportEl: HTMLElement, scene: Rect, pa
   off.style.position = 'fixed'; off.style.left = '-10000px'; off.style.top = '0';
   off.style.width = `${outW}px`; off.style.height = `${outH}px`;
   off.style.background = '#ffffff'; off.style.overflow = 'visible';
-  const clone = viewportEl.cloneNode(true) as HTMLElement;
-  clone.classList.add('rf-exporting');
-  clone.style.transformOrigin = '0 0';
-  clone.style.transform = `matrix(${scale}, 0, 0, ${scale}, ${-scene.x * scale + padding}, ${-scene.y * scale + padding})`;
-  clone.style.willChange = 'transform'; clone.style.backfaceVisibility = 'hidden';
-  off.appendChild(clone); document.body.appendChild(off);
+
+  // Clone the full React Flow container to include edges and nodes, not just the viewport
+  const root = (viewportEl.closest('.react-flow') as HTMLElement) || (viewportEl.closest('.react-flow__renderer') as HTMLElement) || viewportEl;
+  const cloneRoot = root.cloneNode(true) as HTMLElement;
+  cloneRoot.classList.add('rf-exporting');
+  // Apply transform to the cloned viewport inside the cloned root
+  const vpClone = cloneRoot.querySelector('.react-flow__viewport') as HTMLElement | null;
+  const target = vpClone || cloneRoot;
+  target.style.transformOrigin = '0 0';
+  target.style.transform = `matrix(${scale}, 0, 0, ${scale}, ${-scene.x * scale + padding}, ${-scene.y * scale + padding})`;
+  target.style.willChange = 'transform';
+  (target.style as any).backfaceVisibility = 'hidden';
+
+  off.appendChild(cloneRoot); document.body.appendChild(off);
   // Inline external images to prevent CORS taint
-  await inlineExternalImages(clone);
+  await inlineExternalImages(cloneRoot);
   await waitFontsReady(); await waitFrames(2);
   const pr = getExportPixelRatio(outW, outH);
-  const dataUrl = await toPngSafe(clone, { pixelRatio: pr, width: outW, height: outH, backgroundColor: '#ffffff' });
+  const dataUrl = await toPngSafe(cloneRoot, { pixelRatio: pr, width: outW, height: outH, backgroundColor: '#ffffff' });
   document.body.removeChild(off);
   return dataUrl;
 }
