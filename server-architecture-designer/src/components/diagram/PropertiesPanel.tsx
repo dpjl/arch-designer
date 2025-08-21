@@ -426,6 +426,16 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
             {!isDoor && !isContainer && !isNetwork && (
               <div className="space-y-2">
                 <SectionTitle>Instances</SectionTitle>
+                {/* Option: use service color for all instance backgrounds */}
+                <div className="flex items-center gap-2 mb-1">
+                  <input
+                    type="checkbox"
+                    id="useServiceColorForInstances"
+                    checked={!!selection.data.useServiceColorForInstances}
+                    onChange={e => onChange({ data: { ...selection.data, useServiceColorForInstances: e.target.checked } })}
+                  />
+                  <label htmlFor="useServiceColorForInstances" className="text-xs select-none cursor-pointer">Utiliser la couleur du service pour les instances</label>
+                </div>
                 <div className="space-y-2">
                   {(selection.data.instances || []).map((ins: any, idx: number) => {
                     const auth = ins?.auth as ('auth1'|'auth2'|undefined);

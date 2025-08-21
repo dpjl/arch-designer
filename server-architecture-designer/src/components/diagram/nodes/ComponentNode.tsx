@@ -2,7 +2,7 @@
 import { CONTAINER_HEADER_HEIGHT, GRID_SIZE } from '../constants';
 import React, { memo, useLayoutEffect, useRef, useState } from 'react';
 import { Handle, Position, useStore } from 'reactflow';
-import { Boxes, Lock, Unlock } from 'lucide-react';
+import { Boxes, Lock, Unlock, Key } from 'lucide-react';
 import { useTheme } from '../../theme/ThemeProvider';
 import { useGroups } from '@/contexts/GroupsContext';
 import { hexToRgba, autoTextColor } from '../diagram-helpers';
@@ -67,7 +67,8 @@ const ComponentNode = memo(({ id, data, selected, isConnectable }: ComponentNode
   const { getById } = useGroups();
   const group = groupId ? getById(groupId) : undefined;
   const autoRef = useRef<HTMLDivElement|null>(null);
-  const [autoW, setAutoW] = useState<number>();
+  const serviceRef = useRef<HTMLDivElement|null>(null);
+  const [autoServiceW, setAutoServiceW] = useState<number>();
   const effectiveColor = group?.color || color;
   const effectiveBgBase = group?.color || bgColor;
   // Darken a hex color by mixing with black by factor [0..1]
@@ -88,7 +89,12 @@ const ComponentNode = memo(({ id, data, selected, isConnectable }: ComponentNode
   // For grouped services, use solid background (no opacity) exactly as chosen; otherwise honor bgOpacity
   const bg = group ? baseBg : hexToRgba(baseBg, bgOpacity);
   // For grouped services, derive a slightly darker border from the group color for visual separation
-  const borderColor = group ? darkenHex(effectiveColor, 0.22) : effectiveBorderColor(effectiveColor, isDark);
+  let borderColor;
+  if (isAuto(effectiveColor)) {
+    borderColor = isDark ? '#aaa8a8ff' : '#4b4949ff';
+  } else {
+    borderColor = group ? darkenHex(effectiveColor, 0.22) : effectiveBorderColor(effectiveColor, isDark);
+  }
   // Helper to mix two hex colors (returns hex). wb is weight of B in [0..1]
   const mixHex = (hexA?: string, hexB?: string, wb: number = 0.5) => {
     const parse = (h?: string): [number,number,number] | null => {
@@ -256,38 +262,30 @@ const ComponentNode = memo(({ id, data, selected, isConnectable }: ComponentNode
   }
 
   const tex = getBrickTexture();
-  // Service node width computation
+  // Service node width computation (applies to the service card only)
   let serviceWidth: number | undefined;
   if (widthMode === 'fixed') {
-    serviceWidth = 240; // legacy fixed width
+    serviceWidth = 240;
   } else if (widthMode === 'custom') {
     serviceWidth = Math.max(140, Math.min(800, customWidth || 240));
-  } // auto: undefined => shrink to fit via inline-flex
+  } else if (widthMode === 'auto') {
+    serviceWidth = autoServiceW;
+  }
 
-  // Measure auto width (content + instance tabs) after paint
+  // Measure auto width based on the service card content only (exclude instances)
   useLayoutEffect(() => {
-    if (widthMode !== 'auto') { setAutoW(undefined); return; }
-    const el = autoRef.current; if (!el) return;
-    // Temporarily allow content to shrink so we can measure intrinsic width
+    if (widthMode !== 'auto') { setAutoServiceW(undefined); return; }
+    const el = serviceRef.current; if (!el) return;
     const prevWidth = el.style.width;
     const prevMinWidth = el.style.minWidth;
     el.style.width = 'fit-content';
     el.style.minWidth = '0';
-    // Measure base content width (exclude absolute tabs)
     let w = el.scrollWidth;
-    // Measure instance tabs (absolute) and ensure container can fit them
-    const tabs = el.querySelector('[data-instance-tabs] .flex');
-    if (tabs instanceof HTMLElement) {
-      const tabsW = tabs.scrollWidth + 16; // small padding allowance
-      if (tabsW > w) w = tabsW;
-    }
-    // Clamp
-    w = Math.max(140, Math.min(w, 1000));
-    // Restore before applying state to avoid flicker
+    w = Math.max(140, Math.min(w, 800));
     el.style.width = prevWidth;
     el.style.minWidth = prevMinWidth;
-    if (!autoW || Math.abs(autoW - w) > 0.5) setAutoW(w);
-  }, [widthMode, label, data?.instances, features, icon, borderColor, bgColor, customWidth]);
+    if (!autoServiceW || Math.abs((autoServiceW || 0) - w) > 0.5) setAutoServiceW(w);
+  }, [widthMode, label, features, icon, borderColor, customWidth]);
 
   return (
     <div className="relative inline-block" style={{ ['--fwtexH' as any]: features?.firewall ? `url('${tex.urlH}')` : undefined, ['--fwtexV' as any]: features?.firewall ? `url('${tex.urlV}')` : undefined, ['--fwtexSize' as any]: features?.firewall ? `${tex.size}px ${tex.size}px` : undefined, ['--fwtexOffX' as any]: `${tex.offX}px`, ['--fwtexOffY' as any]: `${tex.offY}px`, ['--fwShiftTopY' as any]: `${tex.shiftTopY}px`, ['--fwShiftSideX' as any]: `${tex.shiftSideX}px`, ['--ringGapInner' as any]: '5px', ['--ringThickness' as any]: '12px' }}>
@@ -320,8 +318,9 @@ const ComponentNode = memo(({ id, data, selected, isConnectable }: ComponentNode
   {(() => {
     const hasNetworks = Array.isArray(data?.networkColors) && data.networkColors.length > 0;
     return (
-  <div ref={widthMode==='auto'?autoRef:undefined} className={"group rounded-2xl shadow-lg px-2 pt-1 pb-1 hover:shadow-xl transition overflow-visible border relative dark:shadow-slate-950/40 " + (widthMode==='auto' ? ' inline-flex items-center' : '')}
-       style={{ borderColor, background: bg, width: widthMode==='auto' ? (autoW? `${autoW}px` : undefined) : serviceWidth }}>
+  <div ref={autoRef} className={"flex items-stretch gap-2 transition " + (widthMode==='auto' ? '' : '')}>
+        {/* Service card */}
+  <div ref={serviceRef} className="group rounded-2xl shadow-lg px-2 pt-1 pb-1 hover:shadow-xl transition overflow-visible border relative dark:shadow-slate-950/40" style={{ borderColor, background: bg, width: serviceWidth, zIndex: 200 }}>
         {hasNetworks && (
           <div className="pointer-events-none absolute h-1.5 flex overflow-hidden"
                style={{ top:0, left:4, right:4, borderTopLeftRadius:'calc(1rem - 4px)', borderTopRightRadius:'calc(1rem - 4px)', clipPath:'inset(0 0 0 0 round calc(1rem - 4px) calc(1rem - 4px) 0 0)' }}>
@@ -340,32 +339,52 @@ const ComponentNode = memo(({ id, data, selected, isConnectable }: ComponentNode
           <span className="inline-block h-2 w-2 rounded-full flex-shrink-0" style={{ background: borderColor }} />
           <FeaturesIcons features={features} compact={!showText} />
         </div>
-        {Array.isArray(data?.instances) && data.instances.length > 0 && (
+        </div>
+        {/* Instances as vertical rectangles on the right */}
+    {Array.isArray(data?.instances) && data.instances.length > 0 && (
           (() => {
-            const list = data.instances as any[]; const MAX = 7; const shown = list.slice(0, MAX); const more = list.length - shown.length;
-            // resolve instance group colors/labels via global provider
-            let groupsMap: Record<string, { label: string; color: string }> = {};
-            try {
-              const ctx = (require('@/contexts/InstanceGroupsContext') as any);
-              // at runtime, we can't use hook here; rely on window injection fallback if provided
-              groupsMap = (window as any).__instanceGroupsMap || {};
-            } catch {}
+            const list = data.instances as any[];
+            const groupsMap: Record<string, { label: string; color: string }> = (window as any).__instanceGroupsMap || {};
+            const useServiceColor = !!data?.useServiceColorForInstances;
             return (
-              <div className="absolute top-0 left-2 right-2 z-[5] pointer-events-none transform -translate-y-full" data-instance-tabs>
-                <div className="flex items-end gap-1">
-                  {shown.map((ins: any, i: number) => (
-                    <div key={i} className="pointer-events-none px-1.5 py-0.5 rounded-t-lg border border-b-0 text-[10px] shadow-sm max-w-[120px] flex items-center gap-1" style={{ borderColor, background: (groupsMap[ins?.groupId||'']?.color) || '#ffffff', color: autoTextColor(groupsMap[ins?.groupId||'']?.color || '#ffffff') }}>
-                      <span className="truncate" style={{ maxWidth: '80px' }}>{groupsMap[ins?.groupId||'']?.label || `#${i+1}`}</span>
-                      {ins?.auth ? (<span className="inline-flex flex-col leading-[0.8] text-[9px]"><span>🔑</span>{ins.auth === 'auth2' && <span>🔑</span>}</span>) : null}
+              <div className="relative flex items-stretch" style={{ minWidth: '28px', marginLeft: '-20px' }}>
+                {list.map((ins:any, i:number) => {
+                  const grp = groupsMap[ins?.groupId||''];
+                  let bgCol;
+                  if (useServiceColor) {
+                    // Use the same logic as the service for background color (auto, group, theme-aware)
+                    const base = group?.color || bgColor;
+                    bgCol = effectiveBgColor(base, isDark);
+                  } else {
+                    bgCol = grp?.color || '#ffffff';
+                  }
+                  const fgCol = autoTextColor(bgCol);
+                  const isDouble = ins?.auth === 'auth2';
+                  return (
+                    <div key={i} className="absolute top-0 bottom-0 rounded-2xl border shadow-sm flex flex-col items-end justify-end px-1 pt-0.5 pb-0.5" style={{ borderColor, background: bgCol, left: `${i*16}px`, minWidth: '28px', maxWidth: '100px', zIndex: 150 - i }}>
+                      <div className="w-full flex flex-col items-end justify-end">
+                        {ins?.auth && (
+                          isDouble ? (
+                            <span className="inline-flex flex-col items-end justify-end mb-0.5" style={{marginRight: '-1px'}}>
+                              <Key className="h-3 w-3" strokeWidth={2.1} />
+                              <Key className="h-2.5 w-2.5 -mt-1" strokeWidth={2.1} />
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-end justify-end mb-1" style={{marginRight: '-1px'}}>
+                              <Key className="h-3 w-3" strokeWidth={2.1} />
+                            </span>
+                          )
+                        )}
+                        <span className="text-[10px] font-medium text-right truncate w-full leading-tight" style={{ color: fgCol, fontVariant: 'small-caps', letterSpacing: '0.3px' }} title={grp?.label || ''}>{grp?.label || ''}</span>
+                      </div>
                     </div>
-                  ))}
-                  {more > 0 && (<div className="pointer-events-none px-2 py-0.5 rounded-t-lg border border-b-0 text-slate-600 text-[10px] shadow-sm bg-slate-50" style={{ borderColor }}>+{more}</div>)}
-                </div>
+                  );
+                })}
               </div>
             );
           })()
         )}
-    </div>
+      </div>
       ); })()}
     </div>
   );

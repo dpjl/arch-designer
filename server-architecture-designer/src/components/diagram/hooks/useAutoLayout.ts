@@ -14,16 +14,10 @@ export const useAutoLayout = (globalConfig: AutoLayoutConfig) => {
     return true;
   }, []);
 
-  // Fonction pour calculer la hauteur réelle d'un nœud (incluant les onglets instances)
+  // Fonction pour calculer la hauteur réelle d'un nœud (les instances sont rendues sur la droite, pas au-dessus)
   const calculateRealNodeHeight = useCallback((node: Node): number => {
     // Hauteur de base du nœud
     let baseHeight = node.height || node.data?.height || node.style?.height || 60;
-    
-    // Si le nœud a des instances, ajouter la hauteur des onglets
-    if (node.data?.instances && Array.isArray(node.data.instances) && node.data.instances.length > 0) {
-      // Hauteur approximative des onglets d'instances : 24px (padding + border + texte)
-      baseHeight += 24;
-    }
     
     return baseHeight;
   }, []);
@@ -185,12 +179,8 @@ export const useAutoLayout = (globalConfig: AutoLayoutConfig) => {
             positionX += (columnWidths[col] || 0) + itemSpacing;
           }
           
-          // Calculer la position Y ajustée pour les onglets d'instances
+          // Position Y inchangée: les instances n'ajoutent plus de hauteur au-dessus
           let positionY = nodePosition.y;
-          if ((node as any).data?.instances && Array.isArray((node as any).data.instances) && (node as any).data.instances.length > 0) {
-            // Décaler vers le bas pour laisser l'espace aux onglets au-dessus
-            positionY += 24;
-          }
           
           return {
             ...node,
