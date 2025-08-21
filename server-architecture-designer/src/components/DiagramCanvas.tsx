@@ -302,7 +302,7 @@ function DiagramCanvas({
       (window as any).__instanceGroupsMap = Object.fromEntries(instanceGroups.map(g => [g.id, { label: g.label, color: g.color }]));
     } catch {}
   }, [instanceGroups]);
-  const { project } = useReactFlow();
+  const { project, fitView, getViewport, setViewport, getNodes: rfGetNodes } = useReactFlow();
   const [mode, setMode] = useState<typeof MODES[keyof typeof MODES]>(MODES.EDIT);
   // History (refactored using hook) - will be initialized after nodes/edges state
   const [historyFlash, setHistoryFlash] = useState<string | null>(null);
@@ -1142,40 +1142,392 @@ function DiagramCanvas({
   const onClear = useCallback(() => { setNodes([]); setEdges([]); setSelection(null); historyRef.current = { past: [], present: { nodes: [], edges: [] }, future: [] }; lastCommitRef.current = Date.now(); try { localStorage.removeItem(HISTORY_STORAGE_KEY); } catch(_){} showFlash('Cleared'); }, [showFlash]);
 
   // Export
+  // Safer export helpers
+  const getExportPixelRatio = (w: number, h: number) => {
+    const dpr = (typeof window !== 'undefined' && (window.devicePixelRatio || 1)) || 1;
+    const maxLongest = 4096; // target longest side in px for good readability
+    const longest = Math.max(1, Math.max(w, h));
+    let ratio = Math.max(2, Math.min(5, (maxLongest / longest) * dpr));
+    // Safety cap on total pixels to avoid white screens (canvas limit/memory)
+    const maxPixels = 28_000_000; // ~28 MP
+    const curPixels = w * h * ratio * ratio;
+    if (curPixels > maxPixels) {
+      ratio = Math.sqrt(maxPixels / Math.max(1, w * h));
+    }
+    // Final clamp
+    ratio = Math.max(1.5, Math.min(5, ratio));
+    return ratio;
+  };
+  // Helpers: parse viewport transform and compute screen rect for a node
+  const parseViewportTransform = (el: HTMLElement) => {
+    const t = getComputedStyle(el).transform;
+    if (!t || t === 'none') return { scale: 1, tx: 0, ty: 0 };
+    const m = t.match(/matrix\(([^)]+)\)/);
+    if (!m) return { scale: 1, tx: 0, ty: 0 };
+    const parts = m[1].split(',').map(v=>parseFloat(v.trim()));
+    const a = parts[0] ?? 1; const d = parts[3] ?? a; const e = parts[4] ?? 0; const f = parts[5] ?? 0;
+    const scale = a; // assume uniform scale, no rotation
+    return { scale, tx: e, ty: f };
+  };
+  const getSelectedNodeSceneRect = () => {
+    if (!selection || selection.type !== 'node') return null;
+    const n = nodes.find(nd => nd.id === selection.id);
+    if (!n) return null;
+    const pos = absolutePosition(n, nodes);
+    const w = (n.style?.width as number) || (n.data?.width as number) || (n.width as number) || 520;
+    const h = (n.style?.height as number) || (n.data?.height as number) || (n.height as number) || 320;
+    return { x: pos.x, y: pos.y, w, h };
+  };
+
+  // Compute tight content bounds within the viewport element (in screen px)
+  const computeTightBounds = (viewportEl: HTMLElement) => {
+    const vpRect = viewportEl.getBoundingClientRect();
+    const elems = [
+      ...Array.from(viewportEl.querySelectorAll('.react-flow__node')) as Element[],
+      ...Array.from(viewportEl.querySelectorAll('.react-flow__edge-path')) as Element[],
+    ] as HTMLElement[];
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    elems.forEach(el => {
+      const r = el.getBoundingClientRect();
+      if (!r.width && !r.height) return;
+      minX = Math.min(minX, r.left - vpRect.left);
+      minY = Math.min(minY, r.top - vpRect.top);
+      maxX = Math.max(maxX, r.right - vpRect.left);
+      maxY = Math.max(maxY, r.bottom - vpRect.top);
+    });
+    if (!isFinite(minX)) return { x: 0, y: 0, w: vpRect.width, h: vpRect.height };
+    return { x: Math.max(0, Math.floor(minX)), y: Math.max(0, Math.floor(minY)), w: Math.ceil(maxX - minX), h: Math.ceil(maxY - minY) };
+  };
+
   const onExportPng = useCallback(async () => {
     if (!reactFlowWrapper.current) return;
     const node = reactFlowWrapper.current.querySelector(".react-flow__viewport") as HTMLElement | null;
     if (!node) return;
-    const dataUrl = await htmlToImage.toPng(node, { pixelRatio: 2, cacheBust: true, backgroundColor: "white" });
-    const link = document.createElement("a");
+    // Compute crop bounds: prefer selected node area; fallback to all content
+    const vpRect = node.getBoundingClientRect();
+    const padding = 6; // extra pixels around selection
+    let crop: { x:number; y:number; w:number; h:number } | null = null;
+    try {
+      const scene = getSelectedNodeSceneRect();
+      if (scene) {
+        // If selection exists, temporarily fit it fully into the viewport so off-screen parts are visible in snapshot
+        const { scale: curScale } = parseViewportTransform(node);
+        const targetScale = Math.min((vpRect.width - padding*2) / scene.w, (vpRect.height - padding*2) / scene.h);
+        const tx2 = Math.round((vpRect.width - scene.w * targetScale) / 2 - scene.x * targetScale);
+        const ty2 = Math.round((vpRect.height - scene.h * targetScale) / 2 - scene.y * targetScale);
+        const prevTransform = node.style.transform;
+        const prevOrigin = node.style.transformOrigin;
+        try {
+          node.style.transformOrigin = '0 0';
+          node.style.transform = `matrix(${targetScale}, 0, 0, ${targetScale}, ${tx2}, ${ty2})`;
+          // After fitting, crop exactly around the object centered on screen
+          const objW = Math.ceil(scene.w * targetScale);
+          const objH = Math.ceil(scene.h * targetScale);
+          const cx = Math.max(0, Math.floor((vpRect.width - objW) / 2) - padding);
+          const cy = Math.max(0, Math.floor((vpRect.height - objH) / 2) - padding);
+          const cw = Math.min(Math.ceil(vpRect.width - cx), objW + padding * 2);
+          const ch = Math.min(Math.ceil(vpRect.height - cy), objH + padding * 2);
+          crop = { x: cx, y: cy, w: cw, h: ch };
+          // Small sync to ensure styles applied
+          await new Promise(r=>requestAnimationFrame(()=>r(null)));
+        } finally {
+          // We'll restore after snapshot below
+          // Store to restore later outside of try/catch around snapshot
+          (node as any).__prevTransform = prevTransform;
+          (node as any).__prevOrigin = prevOrigin;
+        }
+      }
+    } catch {}
+    if (!crop) {
+      const elems = [
+        ...Array.from(node.querySelectorAll('.react-flow__node')) as Element[],
+        ...Array.from(node.querySelectorAll('.react-flow__edge')) as Element[],
+      ] as HTMLElement[];
+      let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+      elems.forEach(el => {
+        const r = el.getBoundingClientRect();
+        if (!r.width && !r.height) return;
+        minX = Math.min(minX, r.left - vpRect.left);
+        minY = Math.min(minY, r.top - vpRect.top);
+        maxX = Math.max(maxX, r.right - vpRect.left);
+        maxY = Math.max(maxY, r.bottom - vpRect.top);
+      });
+      if (!isFinite(minX) || !isFinite(minY) || !isFinite(maxX) || !isFinite(maxY)) return; // nothing to export
+      crop = { x: Math.max(0, Math.floor(minX)), y: Math.max(0, Math.floor(minY)), w: Math.ceil(maxX - minX), h: Math.ceil(maxY - minY) };
+    }
+  const pixelRatio = getExportPixelRatio(vpRect.width, vpRect.height);
+  node.classList.add('rf-exporting');
+  const fullUrl = await htmlToImage.toPng(node, { pixelRatio, cacheBust: true, backgroundColor: '#ffffff' });
+  node.classList.remove('rf-exporting');
+    // Restore original transform if we changed it
+    if ((node as any).__prevTransform !== undefined) {
+      node.style.transform = (node as any).__prevTransform;
+      node.style.transformOrigin = (node as any).__prevOrigin;
+      delete (node as any).__prevTransform;
+      delete (node as any).__prevOrigin;
+    }
+  const base = await new Promise<HTMLImageElement>((resolve)=>{ const im=new Image(); im.onload=()=>resolve(im); im.src=fullUrl; });
+  const imgW = base.width; const imgH = base.height;
+  const sx = Math.max(0, Math.min(imgW, Math.round(crop.x * pixelRatio)));
+  const sy = Math.max(0, Math.min(imgH, Math.round(crop.y * pixelRatio)));
+  const sw = Math.max(1, Math.min(imgW - sx, Math.round(crop.w * pixelRatio)));
+  const sh = Math.max(1, Math.min(imgH - sy, Math.round(crop.h * pixelRatio)));
+  const canvas = document.createElement('canvas');
+  canvas.width = sw; canvas.height = sh;
+  const ctx = canvas.getContext('2d'); if (!ctx) return;
+  ctx.drawImage(base, sx, sy, sw, sh, 0, 0, sw, sh);
+    const dataUrl = canvas.toDataURL('image/png');
+    const link = document.createElement('a');
     link.download = `architecture-${Date.now()}.png`;
     link.href = dataUrl;
     link.click();
-  }, []);
+  }, [selection]);
 
-  const onExportPdf = useCallback(async () => {
+  const onExportPdf = useCallback(async (orientation: 'portrait'|'landscape' = 'portrait') => {
     if (!reactFlowWrapper.current) return;
     const node = reactFlowWrapper.current.querySelector('.react-flow__viewport') as HTMLElement | null;
     if (!node) return;
     try {
-      const dataUrl = await htmlToImage.toPng(node, { pixelRatio: 2, cacheBust: true, backgroundColor: '#ffffff' });
-      const img = new Image();
-      img.onload = () => {
-        const pxWidth = img.width, pxHeight = img.height;
-        const landscape = pxWidth > pxHeight;
-        const doc = new jsPDF({ orientation: landscape ? 'landscape' : 'portrait', unit: 'mm', format: 'a4' });
-        const pageSize = doc.internal.pageSize;
-        const pageW = pageSize.getWidth();
-        const pageH = pageSize.getHeight();
-        const margin = 10; const availW = pageW - margin*2; const availH = pageH - margin*2;
-        const scale = Math.min(availW / pxWidth, availH / pxHeight);
-        const renderW = pxWidth * scale; const renderH = pxHeight * scale;
-        const offX = (pageW - renderW)/2; const offY = (pageH - renderH)/2;
-        doc.addImage(dataUrl, 'PNG', offX, offY, renderW, renderH);
-        doc.save(`architecture-${Date.now()}.pdf`);
-      };
-      img.src = dataUrl;
+      // Compute crop: prefer selected node region
+      const vpRect = node.getBoundingClientRect();
+      const padding = 6;
+      let crop: { x:number; y:number; w:number; h:number } | null = null;
+      try {
+        const scene = getSelectedNodeSceneRect();
+        if (scene) {
+          // Fit selection fully inside viewport before snapshot
+          const { scale: curScale } = parseViewportTransform(node);
+          const targetScale = Math.min((vpRect.width - padding*2) / scene.w, (vpRect.height - padding*2) / scene.h);
+          const tx2 = Math.round((vpRect.width - scene.w * targetScale) / 2 - scene.x * targetScale);
+          const ty2 = Math.round((vpRect.height - scene.h * targetScale) / 2 - scene.y * targetScale);
+          const prevTransform = node.style.transform;
+          const prevOrigin = node.style.transformOrigin;
+          try {
+            node.style.transformOrigin = '0 0';
+            node.style.transform = `matrix(${targetScale}, 0, 0, ${targetScale}, ${tx2}, ${ty2})`;
+            const objW = Math.ceil(scene.w * targetScale);
+            const objH = Math.ceil(scene.h * targetScale);
+            const cx = Math.max(0, Math.floor((vpRect.width - objW) / 2) - padding);
+            const cy = Math.max(0, Math.floor((vpRect.height - objH) / 2) - padding);
+            const cw = Math.min(Math.ceil(vpRect.width - cx), objW + padding * 2);
+            const ch = Math.min(Math.ceil(vpRect.height - cy), objH + padding * 2);
+            crop = { x: cx, y: cy, w: cw, h: ch };
+            await new Promise(r=>requestAnimationFrame(()=>r(null)));
+          } finally {
+            (node as any).__prevTransform = prevTransform;
+            (node as any).__prevOrigin = prevOrigin;
+          }
+        }
+      } catch {}
+      if (!crop) {
+        const elems = [
+          ...Array.from(node.querySelectorAll('.react-flow__node')) as Element[],
+          ...Array.from(node.querySelectorAll('.react-flow__edge')) as Element[],
+        ] as HTMLElement[];
+        let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+        elems.forEach(el => {
+          const r = el.getBoundingClientRect();
+          if (!r.width && !r.height) return;
+          minX = Math.min(minX, r.left - vpRect.left);
+          minY = Math.min(minY, r.top - vpRect.top);
+          maxX = Math.max(maxX, r.right - vpRect.left);
+          maxY = Math.max(maxY, r.bottom - vpRect.top);
+        });
+        if (!isFinite(minX) || !isFinite(minY) || !isFinite(maxX) || !isFinite(maxY)) return;
+        crop = { x: Math.max(0, Math.floor(minX)), y: Math.max(0, Math.floor(minY)), w: Math.ceil(maxX - minX), h: Math.ceil(maxY - minY) };
+      }
+  const pixelRatio = getExportPixelRatio(vpRect.width, vpRect.height);
+  node.classList.add('rf-exporting');
+  const fullUrl = await htmlToImage.toPng(node, { pixelRatio, cacheBust: true, backgroundColor: '#ffffff' });
+  node.classList.remove('rf-exporting');
+      if ((node as any).__prevTransform !== undefined) {
+        node.style.transform = (node as any).__prevTransform;
+        node.style.transformOrigin = (node as any).__prevOrigin;
+        delete (node as any).__prevTransform;
+        delete (node as any).__prevOrigin;
+      }
+  const base = await new Promise<HTMLImageElement>((resolve)=>{ const im=new Image(); im.onload=()=>resolve(im); im.src=fullUrl; });
+  const imgWpx = base.width; const imgHpx = base.height;
+  const sx = Math.max(0, Math.min(imgWpx, Math.round(crop.x * pixelRatio)));
+  const sy = Math.max(0, Math.min(imgHpx, Math.round(crop.y * pixelRatio)));
+  const sw = Math.max(1, Math.min(imgWpx - sx, Math.round(crop.w * pixelRatio)));
+  const sh = Math.max(1, Math.min(imgHpx - sy, Math.round(crop.h * pixelRatio)));
+  const c = document.createElement('canvas');
+  c.width = sw; c.height = sh;
+  const ctx = c.getContext('2d'); if (!ctx) return;
+  ctx.drawImage(base, sx, sy, sw, sh, 0, 0, sw, sh);
+      const croppedUrl = c.toDataURL('image/png');
+      // Fit into A4 with margins
+      const doc = new jsPDF({ orientation, unit: 'mm', format: 'a4' });
+      const pageSize = doc.internal.pageSize;
+      const pageW = pageSize.getWidth();
+      const pageH = pageSize.getHeight();
+      const margin = 10; const availW = pageW - margin*2; const availH = pageH - margin*2;
+      const imgW = c.width; const imgH = c.height;
+  const scale = Math.min(availW / imgW, availH / imgH);
+  const renderW = imgW * scale; const renderH = imgH * scale;
+  const offX = (pageW - renderW)/2; const offY = (pageH - renderH)/2;
+  doc.addImage(croppedUrl, 'PNG', offX, offY, renderW, renderH);
+      doc.save(`architecture-${Date.now()}.pdf`);
     } catch (e) { console.error(e); }
+  }, [selection, nodes]);
+
+  // Print only the selected object (and its contents) by cropping the current viewport capture
+  const onPrintSelection = useCallback(async () => {
+    if (!reactFlowWrapper.current) { showFlash('Rien à imprimer'); return; }
+    const node = reactFlowWrapper.current.querySelector('.react-flow__viewport') as HTMLElement | null;
+    if (!node) { showFlash('Rien à imprimer'); return; }
+    if (!selection || selection.type !== 'node') { showFlash('Sélectionnez un objet à imprimer'); return; }
+    try {
+      // Fit selection fully into viewport temporarily to include off-screen parts, then crop tightly around it
+      const vpRect = node.getBoundingClientRect();
+      const padding = 8;
+      const n = nodes.find(nd => nd.id === selection.id);
+      if (!n) { showFlash('Objet introuvable'); return; }
+      const pos = absolutePosition(n, nodes);
+      const w = (n.style?.width as number) || (n.data?.width as number) || (n.width as number) || 520;
+      const h = (n.style?.height as number) || (n.data?.height as number) || (n.height as number) || 320;
+      const targetScale = Math.min((vpRect.width - padding*2) / w, (vpRect.height - padding*2) / h);
+      const tx2 = Math.round((vpRect.width - w * targetScale) / 2 - pos.x * targetScale);
+      const ty2 = Math.round((vpRect.height - h * targetScale) / 2 - pos.y * targetScale);
+      const prevTransform = node.style.transform;
+      const prevOrigin = node.style.transformOrigin;
+      node.style.transformOrigin = '0 0';
+      node.style.transform = `matrix(${targetScale}, 0, 0, ${targetScale}, ${tx2}, ${ty2})`;
+      await new Promise(r=>requestAnimationFrame(()=>r(null)));
+
+      // Snapshot and build a tight crop around the centered object
+      const pixelRatio = 2;
+      node.classList.add('rf-exporting');
+      const fullUrl = await htmlToImage.toPng(node, { pixelRatio, cacheBust: true, backgroundColor: '#ffffff' });
+      node.classList.remove('rf-exporting');
+      // Restore transform immediately to avoid visual jump
+      node.style.transform = prevTransform;
+      node.style.transformOrigin = prevOrigin;
+
+      const objW = Math.ceil(w * targetScale);
+      const objH = Math.ceil(h * targetScale);
+      const cx = Math.max(0, Math.floor((vpRect.width - objW) / 2) - padding);
+      const cy = Math.max(0, Math.floor((vpRect.height - objH) / 2) - padding);
+      const cw = Math.min(Math.ceil(vpRect.width - cx), objW + padding * 2);
+      const ch = Math.min(Math.ceil(vpRect.height - cy), objH + padding * 2);
+
+      const base = await new Promise<HTMLImageElement>((resolve)=>{ const im=new Image(); im.onload=()=>resolve(im); im.src=fullUrl; });
+      const imgW = base.width; const imgH = base.height;
+      const sx = Math.max(0, Math.min(imgW, Math.round(cx * pixelRatio)));
+      const sy = Math.max(0, Math.min(imgH, Math.round(cy * pixelRatio)));
+      const sw = Math.max(1, Math.min(imgW - sx, Math.round(cw * pixelRatio)));
+      const sh = Math.max(1, Math.min(imgH - sy, Math.round(ch * pixelRatio)));
+      const canvas = document.createElement('canvas');
+      canvas.width = sw; canvas.height = sh;
+      const ctx = canvas.getContext('2d'); if (!ctx) return;
+      ctx.imageSmoothingEnabled = true; (ctx as any).imageSmoothingQuality = 'high';
+      ctx.drawImage(base, sx, sy, sw, sh, 0, 0, sw, sh);
+      const dataUrl = canvas.toDataURL('image/png');
+
+      // Print via a hidden iframe to avoid popup blockers and ensure print after image loads
+  const iframe = document.createElement('iframe');
+      iframe.style.position = 'fixed';
+      iframe.style.right = '-10000px';
+      iframe.style.bottom = '-10000px';
+      iframe.style.width = '0';
+      iframe.style.height = '0';
+      iframe.setAttribute('aria-hidden', 'true');
+      document.body.appendChild(iframe);
+      const idoc = iframe.contentDocument || iframe.contentWindow?.document;
+      if (!idoc) { showFlash('Impression non supportée'); iframe.remove(); return; }
+      idoc.open();
+      idoc.write(`<!doctype html><html><head><meta charset="utf-8"><title>Impression</title>
+        <style>@page{size:auto; margin:10mm}html,body{height:100%}body{margin:0;display:flex;align-items:center;justify-content:center;background:#fff}img{max-width:100%;max-height:100%}</style>
+      </head><body>
+        <img id="print-img" alt="selection" />
+      </body></html>`);
+      idoc.close();
+      const iwin = iframe.contentWindow as Window;
+      const imgEl = idoc.getElementById('print-img') as HTMLImageElement | null;
+      if (!imgEl) { showFlash('Impression non supportée'); iframe.remove(); return; }
+      imgEl.onload = () => {
+        try { iwin.focus(); } catch {}
+        setTimeout(() => { try { iwin.print(); } catch {} }, 50);
+        // Clean up a bit later to let print dialog open
+        setTimeout(() => { try { iframe.remove(); } catch {} }, 1000);
+      };
+      imgEl.src = dataUrl;
+    } catch (e) {
+      console.error(e);
+      showFlash('Impression échouée');
+    }
+  }, [selection, nodes]);
+
+  // Print the entire diagram: fit all nodes into view, snapshot, crop to content, print via hidden iframe
+  // Compute full diagram bounds in scene coordinates from nodes
+  const getDiagramSceneBounds = useCallback(() => {
+    if (!nodes.length) return null;
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    nodes.forEach(n => {
+      const pos = absolutePosition(n, nodes);
+      const w = (n.style?.width as number) || (n.data?.width as number) || (n.width as number) || 150;
+      const h = (n.style?.height as number) || (n.data?.height as number) || (n.height as number) || 100;
+      minX = Math.min(minX, pos.x);
+      minY = Math.min(minY, pos.y);
+      maxX = Math.max(maxX, pos.x + w);
+      maxY = Math.max(maxY, pos.y + h);
+    });
+    if (!isFinite(minX)) return null;
+    return { x: minX, y: minY, w: Math.max(1, maxX - minX), h: Math.max(1, maxY - minY) };
+  }, [nodes]);
+
+  const onPrintDiagram = useCallback(async () => {
+    if (!reactFlowWrapper.current) { showFlash('Rien à imprimer'); return; }
+    const viewportEl = reactFlowWrapper.current.querySelector('.react-flow__viewport') as HTMLElement | null;
+    if (!viewportEl) { showFlash('Rien à imprimer'); return; }
+    try {
+  const padding = 12;
+  const scene = getDiagramSceneBounds();
+  if (!scene) { showFlash('Rien à imprimer'); return; }
+  // Clone the viewport and render off-screen with an override transform that frames the full scene
+  const { scale } = parseViewportTransform(viewportEl);
+  const outW = Math.ceil(scene.w * scale + padding * 2);
+  const outH = Math.ceil(scene.h * scale + padding * 2);
+  const offscreen = document.createElement('div');
+  offscreen.style.position = 'fixed';
+  offscreen.style.left = '-10000px';
+  offscreen.style.top = '0';
+  offscreen.style.width = `${outW}px`;
+  offscreen.style.height = `${outH}px`;
+  offscreen.style.background = '#ffffff';
+  const clone = viewportEl.cloneNode(true) as HTMLElement;
+  // Neutralize heavy effects during render
+  clone.classList.add('rf-exporting');
+  clone.style.transformOrigin = '0 0';
+  clone.style.transform = `matrix(${scale}, 0, 0, ${scale}, ${-scene.x * scale + padding}, ${-scene.y * scale + padding})`;
+  clone.style.willChange = 'transform';
+  clone.style.backfaceVisibility = 'hidden';
+  offscreen.appendChild(clone);
+  document.body.appendChild(offscreen);
+  const pixelRatio = 2;
+  const dataUrl = await htmlToImage.toPng(clone, { pixelRatio, cacheBust: true, width: outW, height: outH, backgroundColor: '#ffffff' });
+  // Cleanup
+  document.body.removeChild(offscreen);
+
+      // Print via hidden iframe
+      const iframe = document.createElement('iframe');
+      iframe.style.position = 'fixed'; iframe.style.right = '-10000px'; iframe.style.bottom = '-10000px'; iframe.style.width = '0'; iframe.style.height = '0';
+      iframe.setAttribute('aria-hidden', 'true');
+      document.body.appendChild(iframe);
+      const idoc = iframe.contentDocument || iframe.contentWindow?.document;
+      if (!idoc) { showFlash('Impression non supportée'); iframe.remove(); return; }
+      idoc.open();
+      idoc.write(`<!doctype html><html><head><meta charset="utf-8"><title>Impression</title>
+        <style>@page{size:auto;margin:10mm}html,body{height:100%}body{margin:0;display:flex;align-items:center;justify-content:center;background:#fff}img{max-width:100%;max-height:100%}</style>
+      </head><body><img id="print-img" alt="diagram" /></body></html>`);
+      idoc.close();
+      const iwin = iframe.contentWindow as Window;
+      const imgEl = idoc.getElementById('print-img') as HTMLImageElement | null;
+      if (!imgEl) { showFlash('Impression non supportée'); iframe.remove(); return; }
+      imgEl.onload = () => { try { iwin.focus(); } catch {}; setTimeout(()=>{ try { iwin.print(); } catch {} }, 50); setTimeout(()=>{ try { iframe.remove(); } catch {} }, 1000); };
+      imgEl.src = dataUrl;
+    } catch (e) { console.error(e); showFlash('Impression échouée'); }
   }, []);
 
   // Export graph as JSON file (nodes + edges + groups + global config)
@@ -1447,6 +1799,8 @@ function DiagramCanvas({
             onExportPdf={onExportPdf}
             onExportJson={onExportJson}
             onImportJson={onImportJson}
+            onPrintSelection={onPrintSelection}
+            onPrintDiagram={onPrintDiagram}
             onClear={onClear}
             onUndo={undo}
             onRedo={redo}

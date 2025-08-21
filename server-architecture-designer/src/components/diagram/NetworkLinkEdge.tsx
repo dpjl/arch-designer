@@ -147,6 +147,9 @@ const NetworkLinkEdge = memo(({
           pointerEvents: 'none' // Prevent double click events
         }}
         className="react-flow__edge-path"
+        fill="none"
+        strokeLinecap="round"
+        strokeLinejoin="round"
         d={edgePath}
         markerEnd={markerEnd && typeof markerEnd === 'object' && 'type' in markerEnd ? `url(#${(markerEnd as any).type})` : undefined}
       />

@@ -177,3 +177,17 @@
 .network-link-edge.selected .react-flow__edge-path {
   filter: drop-shadow(0 0 15px currentColor) brightness(1.2);
 }
+
+/* Export mode: disable heavy filters/shadows for stable html-to-image rendering */
+.rf-exporting * { 
+  filter: none !important; 
+  box-shadow: none !important;
+}
+.rf-exporting .react-flow__edge-path { 
+  filter: none !important; 
+}
+.rf-exporting { 
+  -webkit-font-smoothing: antialiased; 
+  -moz-osx-font-smoothing: grayscale; 
+  text-rendering: optimizeLegibility;
+}
