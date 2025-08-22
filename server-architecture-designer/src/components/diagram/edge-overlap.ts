@@ -10,14 +10,7 @@ export type OverlapSegment = {
 
 type Vec = { x:number; y:number };
 
-const EPS = 0.0001;
-const len = (v:Vec) => Math.hypot(v.x, v.y);
 const sub = (a:Vec,b:Vec):Vec=>({x:a.x-b.x,y:a.y-b.y});
-const add = (a:Vec,b:Vec):Vec=>({x:a.x+b.x,y:a.y+b.y});
-const mul = (a:Vec,k:number):Vec=>({x:a.x*k,y:a.y*k});
-const dot = (a:Vec,b:Vec)=>a.x*b.x+a.y*b.y;
-const cross = (a:Vec,b:Vec)=>a.x*b.y-a.y*b.x;
-const norm = (v:Vec):Vec=>{ const L=len(v)||1; return {x:v.x/L,y:v.y/L}; };
 
 function colorForEdge(e:any): string {
   // network link first
@@ -31,26 +24,7 @@ function strokeWForEdge(e:any): number {
   return 2;
 }
 
-function computeStraightEndpoints(nodes: Node[], e: any): { p0: Vec; p1: Vec } | null {
-  // Only consider explicit straight edges
-  const shape = e?.data?.shape || 'smooth';
-  if (shape !== 'straight') return null;
-  const srcAbs = calculateAbsoluteNodePosition(e.source, nodes);
-  const tgtAbs = calculateAbsoluteNodePosition(e.target, nodes);
-  if (!srcAbs || !tgtAbs) return null;
-  // Apply custom anchors if present
-  let s = { x: e.sourceX ?? srcAbs.x, y: e.sourceY ?? srcAbs.y } as Vec;
-  let t = { x: e.targetX ?? tgtAbs.x, y: e.targetY ?? tgtAbs.y } as Vec;
-  if (e?.data?.sourceAnchor) {
-    const ap = calculateAnchorPosition(srcAbs.x, srcAbs.y, srcAbs.width, srcAbs.height, e.data.sourceAnchor.side, e.data.sourceAnchor.offset);
-    s = { x: ap.x, y: ap.y };
-  }
-  if (e?.data?.targetAnchor) {
-    const ap = calculateAnchorPosition(tgtAbs.x, tgtAbs.y, tgtAbs.width, tgtAbs.height, e.data.targetAnchor.side, e.data.targetAnchor.offset);
-    t = { x: ap.x, y: ap.y };
-  }
-  return { p0: s, p1: t };
-}
+// Note: straight-endpoint helper removed; sampling uses actual rendered path instead.
 
 export function computeOverlapSegments(nodes: Node[], edges: Edge[]): OverlapSegment[] {
   // Collect all axis-aligned runs from edges (sampled from path when possible)

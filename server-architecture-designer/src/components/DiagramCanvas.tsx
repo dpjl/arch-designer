@@ -251,6 +251,7 @@ function DiagramCanvas({
   const reactFlowWrapper = useRef<HTMLDivElement | null>(null);
   const { groups, setGroups } = useGroups();
   const { groups: instanceGroups, setGroups: setInstanceGroups } = useInstanceGroups();
+  const [rehydrated, setRehydrated] = useState(false);
   useEffect(()=>{ try { (window as any).__instanceGroupsMap = Object.fromEntries(instanceGroups.map(g=>[g.id,{label:g.label,color:g.color}])); } catch {} }, [instanceGroups]);
   // Expose instance groups for node renderers (no hooks inside ReactFlow node bodies)
   useEffect(()=>{
@@ -264,8 +265,38 @@ function DiagramCanvas({
   const [historyFlash, setHistoryFlash] = useState<string | null>(null);
   const showFlash = useCallback((msg: string) => { setHistoryFlash(msg); setTimeout(() => setHistoryFlash(c => c === msg ? null : c), 900); }, []);
 
-  // Load persisted history once
-  useEffect(()=>{ try{ const raw= localStorage.getItem(HISTORY_STORAGE_KEY); if(raw){ const parsed=JSON.parse(raw); if(parsed?.present?.nodes){ historyRef.current=parsed; setNodes(parsed.present.nodes); setEdges(parsed.present.edges); lastCommitRef.current=Date.now(); } } } catch{} },[]);
+  // Load persisted history once, plus groups and global config for parity with manual "Charger"
+  useEffect(()=>{
+    try {
+      const raw = localStorage.getItem(HISTORY_STORAGE_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (parsed?.present?.nodes) {
+          historyRef.current = parsed;
+          setNodes(parsed.present.nodes);
+          setEdges(parsed.present.edges);
+          lastCommitRef.current = Date.now();
+        }
+      }
+    } catch {}
+    // Rehydrate groups and instance groups
+    try {
+      const gr = JSON.parse(localStorage.getItem('server-arch:groups') || 'null');
+      if (Array.isArray(gr)) setGroups(gr);
+    } catch {}
+    try {
+      const igr = JSON.parse(localStorage.getItem('server-arch:instance-groups') || 'null');
+      if (Array.isArray(igr)) setInstanceGroups(igr);
+    } catch {}
+    // Rehydrate global auto-layout config
+    try {
+      const g = JSON.parse(localStorage.getItem('server-arch:global-config') || 'null');
+      if (g) onUpdateGlobalAutoLayoutConfig({ ...DEFAULT_GLOBAL_AUTO_LAYOUT, ...g });
+    } catch {}
+    // Mark rehydration done on next frame to ensure nodes/edges are applied
+    requestAnimationFrame(() => setRehydrated(true));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  },[]);
 
   // Initial graph
   const initialNodes = useMemo(
@@ -334,6 +365,7 @@ function DiagramCanvas({
 
   // Synchronize network links when networks or nodes change
   useEffect(() => {
+    if (!rehydrated) return; // avoid clobbering persisted edges on first mount
     const networkColorMap = new Map(networks.map(n => [n.id, n.color]));
     
     setEdges((eds) => {
@@ -356,7 +388,7 @@ function DiagramCanvas({
       
       return updatedEdges;
     });
-  }, [networks, nodes]);
+  }, [networks, nodes, rehydrated]);
   
   // Réorganisation automatique quand les paramètres globaux changent
   useEffect(() => {

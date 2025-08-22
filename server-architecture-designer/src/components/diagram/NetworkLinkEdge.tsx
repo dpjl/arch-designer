@@ -1,7 +1,8 @@
 "use client";
-import React, { memo, useCallback, useState } from 'react';
-import { EdgeProps, getBezierPath, getSmoothStepPath, getStraightPath } from 'reactflow';
+import React, { memo, useCallback, useMemo, useState } from 'react';
+import { EdgeProps, getBezierPath, getSmoothStepPath, getStraightPath, useReactFlow, Position } from 'reactflow';
 import { NetworkLinkData } from './network-link-utils';
+import { calculateAbsoluteNodePosition, calculateAnchorPosition } from './edge-anchoring';
 
 interface NetworkLinkEdgeProps extends EdgeProps {
   data: NetworkLinkData;
@@ -62,6 +63,17 @@ const EdgeHandle = memo(({
   );
 });
 
+// Convert string side to React Flow Position
+function stringToPosition(side: string): Position {
+  switch (side) {
+    case 'top': return Position.Top;
+    case 'bottom': return Position.Bottom;
+    case 'left': return Position.Left;
+    case 'right': return Position.Right;
+    default: return Position.Top;
+  }
+}
+
 const NetworkLinkEdge = memo(({ 
   id, 
   source,
@@ -78,40 +90,51 @@ const NetworkLinkEdge = memo(({
   selected
 }: NetworkLinkEdgeProps) => {
   const { networkColor, networkId } = data;
+  const { getNodes } = useReactFlow();
+  
+  // Compute actual connection points honoring saved anchors
+  const connectionPoints = useMemo(() => {
+    const nodes = getNodes();
+    let actualSourceX = sourceX;
+    let actualSourceY = sourceY;
+    let actualTargetX = targetX;
+    let actualTargetY = targetY;
+    if ((data as any)?.sourceAnchor) {
+      const abs = calculateAbsoluteNodePosition(source, nodes);
+      if (abs) {
+        const p = calculateAnchorPosition(abs.x, abs.y, abs.width, abs.height, (data as any).sourceAnchor.side, (data as any).sourceAnchor.offset);
+        actualSourceX = p.x; actualSourceY = p.y;
+      }
+    }
+    if ((data as any)?.targetAnchor) {
+      const abs = calculateAbsoluteNodePosition(target, nodes);
+      if (abs) {
+        const p = calculateAnchorPosition(abs.x, abs.y, abs.width, abs.height, (data as any).targetAnchor.side, (data as any).targetAnchor.offset);
+        actualTargetX = p.x; actualTargetY = p.y;
+      }
+    }
+    return { actualSourceX, actualSourceY, actualTargetX, actualTargetY };
+  }, [getNodes, source, target, sourceX, sourceY, targetX, targetY, (data as any)?.sourceAnchor, (data as any)?.targetAnchor]);
   
   // Calculate the path based on edge type
   const getPath = useCallback(() => {
     const shape = data?.shape || 'smooth';
+    const { actualSourceX, actualSourceY, actualTargetX, actualTargetY } = connectionPoints;
+    let actualSourcePosition = sourcePosition;
+    let actualTargetPosition = targetPosition;
+    if ((data as any)?.sourceAnchor) actualSourcePosition = stringToPosition((data as any).sourceAnchor.side);
+    if ((data as any)?.targetAnchor) actualTargetPosition = stringToPosition((data as any).targetAnchor.side);
     
     switch (shape) {
       case 'straight':
-        return getStraightPath({
-          sourceX,
-          sourceY,
-          targetX,
-          targetY,
-        });
+        return getStraightPath({ sourceX: actualSourceX, sourceY: actualSourceY, targetX: actualTargetX, targetY: actualTargetY });
       case 'step':
-        return getSmoothStepPath({
-          sourceX,
-          sourceY,
-          sourcePosition,
-          targetX,
-          targetY,
-          targetPosition,
-        });
+        return getSmoothStepPath({ sourceX: actualSourceX, sourceY: actualSourceY, sourcePosition: actualSourcePosition, targetX: actualTargetX, targetY: actualTargetY, targetPosition: actualTargetPosition });
       case 'smooth':
       default:
-        return getBezierPath({
-          sourceX,
-          sourceY,
-          sourcePosition,
-          targetX,
-          targetY,
-          targetPosition,
-        });
+        return getBezierPath({ sourceX: actualSourceX, sourceY: actualSourceY, sourcePosition: actualSourcePosition, targetX: actualTargetX, targetY: actualTargetY, targetPosition: actualTargetPosition });
     }
-  }, [sourceX, sourceY, targetX, targetY, sourcePosition, targetPosition, data?.shape]);
+  }, [connectionPoints, sourcePosition, targetPosition, data?.shape, (data as any)?.sourceAnchor, (data as any)?.targetAnchor]);
 
   const [edgePath, labelX, labelY] = getPath();
 

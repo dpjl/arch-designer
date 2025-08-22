@@ -183,7 +183,7 @@ const CustomEdge = memo(({
   const strokeWidth = selected ? (data?.isNetworkLink ? 4 : 3) : (data?.isNetworkLink ? 3 : 2);
   const safeEdgeColor = edgeColor || '#64748b';
 
-  // Overlaps are rendered globally by OverlapsOverlay
+  // Overlaps are rendered globally by EdgeOverlapOverlay
 
   return (
     <g className={`react-flow__edge ${selected ? 'selected' : ''} ${data?.isNetworkLink ? 'network-link-edge' : 'custom-edge'}`}>
