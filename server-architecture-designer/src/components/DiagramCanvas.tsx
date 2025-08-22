@@ -46,9 +46,8 @@ import { applyPatternToEdge } from './diagram/edge-utils';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Trash2, Link2, Palette, Lock, Unlock, LayoutGrid, Boxes } from "lucide-react";
 import * as htmlToImage from 'html-to-image';
-import jsPDF from 'jspdf';
 import { getExportPixelRatio, parseViewportTransform, computeTightBounds } from '@/lib/export/viewport';
-import { exportViewportCropToPng, exportViewportCropToPdf, fitAndExportSelection, exportFullDiagram } from '@/lib/export/exporters';
+import { exportViewportCropToPng, exportFullDiagram } from '@/lib/export/exporters';
 import { printDataUrl } from '@/lib/export/print';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { Input } from "@/components/ui/input";
@@ -1226,88 +1225,6 @@ function DiagramCanvas({
     link.click();
   }, [selection]);
 
-  const onExportPdf = useCallback(async (orientation: 'portrait'|'landscape' = 'portrait') => {
-    if (!reactFlowWrapper.current) return;
-    const node = reactFlowWrapper.current.querySelector('.react-flow__viewport') as HTMLElement | null;
-    if (!node) return;
-    try {
-      // Compute crop: prefer selected node region
-      const vpRect = node.getBoundingClientRect();
-      const padding = 6;
-      let crop: { x:number; y:number; w:number; h:number } | null = null;
-      try {
-        const scene = getSelectedNodeSceneRect();
-        if (scene) {
-          // Fit selection fully inside viewport before snapshot
-          const targetScale = Math.min((vpRect.width - padding*2) / scene.w, (vpRect.height - padding*2) / scene.h);
-          const tx2 = Math.round((vpRect.width - scene.w * targetScale) / 2 - scene.x * targetScale);
-          const ty2 = Math.round((vpRect.height - scene.h * targetScale) / 2 - scene.y * targetScale);
-          const prevTransform = node.style.transform;
-          const prevOrigin = node.style.transformOrigin;
-          try {
-            node.style.transformOrigin = '0 0';
-            node.style.transform = `matrix(${targetScale}, 0, 0, ${targetScale}, ${tx2}, ${ty2})`;
-            const objW = Math.ceil(scene.w * targetScale);
-            const objH = Math.ceil(scene.h * targetScale);
-            const cx = Math.max(0, Math.floor((vpRect.width - objW) / 2) - padding);
-            const cy = Math.max(0, Math.floor((vpRect.height - objH) / 2) - padding);
-            const cw = Math.min(Math.ceil(vpRect.width - cx), objW + padding * 2);
-            const ch = Math.min(Math.ceil(vpRect.height - cy), objH + padding * 2);
-            crop = { x: cx, y: cy, w: cw, h: ch };
-            await new Promise(r=>requestAnimationFrame(()=>r(null)));
-          } finally {
-            (node as any).__prevTransform = prevTransform;
-            (node as any).__prevOrigin = prevOrigin;
-          }
-        }
-      } catch {}
-      if (!crop) {
-        const elems = [
-          ...Array.from(node.querySelectorAll('.react-flow__node')) as Element[],
-          ...Array.from(node.querySelectorAll('.react-flow__edge')) as Element[],
-        ] as HTMLElement[];
-        let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-        elems.forEach(el => {
-          const r = el.getBoundingClientRect();
-          if (!r.width && !r.height) return;
-          minX = Math.min(minX, r.left - vpRect.left);
-          minY = Math.min(minY, r.top - vpRect.top);
-          maxX = Math.max(maxX, r.right - vpRect.left);
-          maxY = Math.max(maxY, r.bottom - vpRect.top);
-        });
-        if (!isFinite(minX) || !isFinite(minY) || !isFinite(maxX) || !isFinite(maxY)) return;
-        crop = { x: Math.max(0, Math.floor(minX)), y: Math.max(0, Math.floor(minY)), w: Math.ceil(maxX - minX), h: Math.ceil(maxY - minY) };
-      }
-      if ((node as any).__prevTransform !== undefined) {
-        node.style.transform = (node as any).__prevTransform;
-        node.style.transformOrigin = (node as any).__prevOrigin;
-        delete (node as any).__prevTransform;
-        delete (node as any).__prevOrigin;
-      }
-      const doc = await exportViewportCropToPdf(node, crop!, orientation);
-      doc.save(`architecture-${Date.now()}.pdf`);
-    } catch (e) { console.error(e); }
-  }, [selection, nodes]);
-
-  // Print only the selected object (and its contents) by cropping the current viewport capture
-  const onPrintSelection = useCallback(async () => {
-    if (!reactFlowWrapper.current) { showFlash('Rien à imprimer'); return; }
-    const node = reactFlowWrapper.current.querySelector('.react-flow__viewport') as HTMLElement | null;
-    if (!node) { showFlash('Rien à imprimer'); return; }
-    if (!selection || selection.type !== 'node') { showFlash('Sélectionnez un objet à imprimer'); return; }
-    try {
-      const n = nodes.find(nd => nd.id === selection.id);
-      if (!n) { showFlash('Objet introuvable'); return; }
-      const pos = absolutePosition(n, nodes);
-      const w = (n.style?.width as number) || (n.data?.width as number) || (n.width as number) || 520;
-      const h = (n.style?.height as number) || (n.data?.height as number) || (n.height as number) || 320;
-      const dataUrl = await fitAndExportSelection(node, { x: pos.x, y: pos.y, w, h }, 8);
-      printDataUrl(dataUrl, 'Impression');
-    } catch (e) {
-      console.error(e);
-      showFlash('Impression échouée');
-    }
-  }, [selection, nodes]);
 
   // Print the entire diagram: fit all nodes into view, snapshot, crop to content, print via hidden iframe
   // Compute full diagram bounds in scene coordinates from nodes
@@ -1632,10 +1549,8 @@ function DiagramCanvas({
             onSave={onSave}
             onLoad={onLoad}
             onExportPng={onExportPng}
-            onExportPdf={onExportPdf}
             onExportJson={onExportJson}
             onImportJson={onImportJson}
-            onPrintSelection={onPrintSelection}
             onPrintDiagram={onPrintDiagram}
             onClear={onClear}
             onUndo={undo}

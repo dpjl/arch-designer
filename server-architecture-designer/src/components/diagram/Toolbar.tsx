@@ -11,10 +11,8 @@ export interface ToolbarProps {
   onSave: ()=>void;
   onLoad: ()=>void;
   onExportPng: ()=>void;
-  onExportPdf: (orientation: 'portrait'|'landscape')=>void;
   onExportJson: ()=>void;
   onImportJson: ()=>void;
-  onPrintSelection: ()=>void;
   onPrintDiagram: ()=>void;
   onClear: ()=>void;
   onUndo: ()=>void;
@@ -27,7 +25,7 @@ export interface ToolbarProps {
 }
 
 export function Toolbar(props: ToolbarProps) {
-  const { mode, setMode, onSave, onLoad, onExportPng, onExportPdf, onExportJson, onImportJson, onPrintSelection, onPrintDiagram, onClear, onUndo, onRedo, canUndo, canRedo, snapEnabled, setSnapEnabled, onSnapAll } = props;
+  const { mode, setMode, onSave, onLoad, onExportPng, onExportJson, onImportJson, onPrintDiagram, onClear, onUndo, onRedo, canUndo, canRedo, snapEnabled, setSnapEnabled, onSnapAll } = props;
   const [open, setOpen] = useState(false);
   
   return (
@@ -40,22 +38,7 @@ export function Toolbar(props: ToolbarProps) {
           <IconButton label="Sauvegarder" onClick={onSave} icon={<Save className="h-4 w-4"/>} />
           <IconButton label="Charger" onClick={onLoad} icon={<Upload className="h-4 w-4"/>} />
           <IconButton label="Exporter PNG" onClick={onExportPng} icon={<ImageIcon className="h-4 w-4"/>} />
-          <IconButton label="Imprimer la sélection" onClick={onPrintSelection} icon={<Printer className="h-4 w-4"/>} />
           <IconButton label="Imprimer le diagramme" onClick={onPrintDiagram} icon={<Printer className="h-4 w-4"/>} />
-          <IconButton label="PDF A4 portrait" onClick={()=>onExportPdf('portrait')} icon={<span className="inline-block h-4 w-4 relative" aria-hidden>
-            <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M6 2h8l4 4v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V4c0-1.1.9-2 2-2Z" />
-              <path d="M14 2v4h4" />
-            </svg>
-            <span className="absolute inset-0 flex items-center justify-center text-[7px] font-bold tracking-tight" style={{fontFamily:'system-ui, sans-serif'}}>P</span>
-          </span>} />
-          <IconButton label="PDF A4 paysage" onClick={()=>onExportPdf('landscape')} icon={<span className="inline-block h-4 w-4 relative rotate-90" aria-hidden>
-            <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M6 2h8l4 4v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V4c0-1.1.9-2 2-2Z" />
-              <path d="M14 2v4h4" />
-            </svg>
-            <span className="absolute inset-0 flex items-center justify-center text-[7px] font-bold tracking-tight" style={{fontFamily:'system-ui, sans-serif'}}>L</span>
-          </span>} />
         </div>
         <div className="hidden lg:flex items-center gap-1">
           <IconButton label="Exporter JSON" onClick={onExportJson} icon={<FileDown className="h-4 w-4"/>} />
@@ -75,22 +58,7 @@ export function Toolbar(props: ToolbarProps) {
           <IconButton label="Sauvegarder" onClick={onSave} icon={<Save className="h-4 w-4"/>} />
           <IconButton label="Charger" onClick={onLoad} icon={<Upload className="h-4 w-4"/>} />
           <IconButton label="Exporter PNG" onClick={onExportPng} icon={<ImageIcon className="h-4 w-4"/>} />
-          <IconButton label="Imprimer la sélection" onClick={onPrintSelection} icon={<Printer className="h-4 w-4"/>} />
           <IconButton label="Imprimer le diagramme" onClick={onPrintDiagram} icon={<Printer className="h-4 w-4"/>} />
-          <IconButton label="PDF A4 portrait" onClick={()=>onExportPdf('portrait')} icon={<span className="inline-block h-4 w-4 relative" aria-hidden>
-            <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M6 2h8l4 4v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V4c0-1.1.9-2 2-2Z" />
-              <path d="M14 2v4h4" />
-            </svg>
-            <span className="absolute inset-0 flex items-center justify-center text-[7px] font-bold tracking-tight" style={{fontFamily:'system-ui, sans-serif'}}>P</span>
-          </span>} />
-          <IconButton label="PDF A4 paysage" onClick={()=>onExportPdf('landscape')} icon={<span className="inline-block h-4 w-4 relative rotate-90" aria-hidden>
-            <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M6 2h8l4 4v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V4c0-1.1.9-2 2-2Z" />
-              <path d="M14 2v4h4" />
-            </svg>
-            <span className="absolute inset-0 flex items-center justify-center text-[7px] font-bold tracking-tight" style={{fontFamily:'system-ui, sans-serif'}}>L</span>
-          </span>} />
           <IconButton label="Exporter JSON" onClick={onExportJson} icon={<FileDown className="h-4 w-4"/>} />
           <IconButton label="Importer JSON" onClick={onImportJson} icon={<FileUp className="h-4 w-4"/>} />
           <IconButton label="Effacer le diagramme" onClick={onClear} icon={<Eraser className="h-4 w-4"/>} />
