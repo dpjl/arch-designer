@@ -12,6 +12,7 @@ import { useGroups } from '@/contexts/GroupsContext';
 import { isAuto } from './color-utils';
 import { AutoLayoutControls } from './AutoLayoutControls';
 import { AutoLayoutConfig } from '@/types/diagram';
+import { useStableInput } from '@/hooks/useStableInput';
 import { useInstanceGroups } from '@/contexts/InstanceGroupsContext';
 
 const DEFAULT_AUTO_LAYOUT: AutoLayoutConfig = {
@@ -96,16 +97,22 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
   const isContainer = isNode && !!selection.data?.isContainer;
   const isDoor = isNode && !!selection.data?.isDoor;
   const isNetwork = isNode && selection.nodeType === 'network';
-  // Local buffer state for network label editing (must be declared before returns)
-  const [tempNetworkLabel, setTempNetworkLabel] = React.useState<string | null>(null);
-  React.useEffect(() => {
-    if (isNetwork) {
-      setTempNetworkLabel(selection?.data?.label || '');
-    } else {
-      setTempNetworkLabel(null);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isNetwork, selection?.id]);
+  // Stable buffered input for network label
+  const netLabel = useStableInput(
+    selection?.id || '',
+    (isNetwork ? (selection?.data?.label || '') : ''),
+    (val) => { if (isNetwork) onChange({ data: { ...selection.data, label: val } }); }
+  );
+  const nodeLabel = useStableInput(
+    selection?.id || '',
+    (isNode && !isNetwork ? (selection?.data?.label || '') : ''),
+    (val) => { if (isNode && !isNetwork) onChange({ data: { ...selection.data, label: val } }); }
+  );
+  const iconUrl = useStableInput(
+    selection?.id || '',
+    (isNode ? (selection?.data?.icon || '') : ''),
+    (val) => { if (isNode) onChange({ data: { ...selection.data, icon: val } }); }
+  );
   if ((multiCount || 0) > 1) {
     return (
   <Card className="rounded-2xl text-[13px] bg-white/80 dark:bg-slate-800/80 backdrop-blur border border-slate-200 dark:border-slate-600 dark:shadow-[0_0_0_1px_rgba(255,255,255,0.05)]">
@@ -163,24 +170,7 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
                 <SectionTitle>Network</SectionTitle>
                 <div className="space-y-1">
                   <Label>Label</Label>
-                  <Input
-                    value={tempNetworkLabel ?? ''}
-                    onChange={(e)=> setTempNetworkLabel(e.target.value)}
-                    onBlur={()=> {
-                      if (tempNetworkLabel !== null && tempNetworkLabel !== selection.data.label) {
-                        onChange({ data: { ...selection.data, label: tempNetworkLabel } });
-                      }
-                    }}
-                    onKeyDown={(e)=> {
-                      if (e.key === 'Enter') {
-                        (e.target as HTMLInputElement).blur();
-                      }
-                      if (e.key === 'Escape') {
-                        setTempNetworkLabel(selection.data.label || '');
-                        (e.target as HTMLInputElement).blur();
-                      }
-                    }}
-                  />
+                  <Input {...netLabel} />
                 </div>
                 {/* Partition badges */}
                 <div className="space-y-1">
@@ -301,10 +291,10 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
                 />
               </div>
             )}
-            {!isDoor && !isNetwork && (
+      {!isDoor && !isNetwork && (
               <div className="space-y-1">
                 <Label>Label</Label>
-                <Input value={selection.data.label || ''} onChange={(e) => onChange({ data: { ...selection.data, label: e.target.value } })} />
+        <Input {...nodeLabel} />
               </div>
             )}
             {/* Group assignment for service nodes (non-container) */}
@@ -709,7 +699,7 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
                     );
                   })}
                 </div>
-                <Input className="mt-2 text-xs" value={selection.data.icon || ''} onChange={(e) => onChange({ data: { ...selection.data, icon: e.target.value } })} placeholder="URL personnalisée..." />
+                <Input className="mt-2 text-xs" placeholder="URL personnalisée..." {...iconUrl} />
               </div>
             )}
             {!isDoor && isNode && selection.parentNode && (

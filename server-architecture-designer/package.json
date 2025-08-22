@@ -11,6 +11,7 @@
     "check": "npm run lint && npm run typecheck"
   },
   "dependencies": {
+    "@monaco-editor/react": "^4.7.0",
     "@radix-ui/react-checkbox": "^1.3.2",
     "@radix-ui/react-label": "^2.1.7",
     "@radix-ui/react-slot": "^1.2.3",
@@ -20,11 +21,13 @@
     "html-to-image": "^1.11.13",
     "jspdf": "^2.5.2",
     "lucide-react": "^0.539.0",
+    "monaco-editor": "^0.52.2",
     "next": "15.4.6",
     "react": "19.1.0",
     "react-dom": "19.1.0",
     "reactflow": "^11.11.4",
-    "tailwind-merge": "^3.3.1"
+    "tailwind-merge": "^3.3.1",
+    "zod": "^4.0.17"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3",

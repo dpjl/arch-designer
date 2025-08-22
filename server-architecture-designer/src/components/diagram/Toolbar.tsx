@@ -1,6 +1,6 @@
 "use client";
 import React, { useState } from 'react';
-import { LayoutGrid, Eye, Pencil, Upload, Save, Boxes, Magnet, FileDown, FileUp, Eraser, CornerUpLeft, CornerUpRight, Image as ImageIcon, Printer } from 'lucide-react';
+import { LayoutGrid, Eye, Pencil, Upload, Save, Boxes, Magnet, FileDown, FileUp, Eraser, CornerUpLeft, CornerUpRight, Image as ImageIcon, Printer, Code as CodeIcon } from 'lucide-react';
 import { ThemeToggle } from '../theme/ThemeToggle';
 import IconButton from './IconButton';
 import { MODES } from './constants';
@@ -14,6 +14,7 @@ export interface ToolbarProps {
   onExportJson: ()=>void;
   onImportJson: ()=>void;
   onPrintDiagram: ()=>void;
+  onEditJson: ()=>void;
   onClear: ()=>void;
   onUndo: ()=>void;
   onRedo: ()=>void;
@@ -25,7 +26,7 @@ export interface ToolbarProps {
 }
 
 export function Toolbar(props: ToolbarProps) {
-  const { mode, setMode, onSave, onLoad, onExportPng, onExportJson, onImportJson, onPrintDiagram, onClear, onUndo, onRedo, canUndo, canRedo, snapEnabled, setSnapEnabled, onSnapAll } = props;
+  const { mode, setMode, onSave, onLoad, onExportPng, onExportJson, onImportJson, onPrintDiagram, onEditJson, onClear, onUndo, onRedo, canUndo, canRedo, snapEnabled, setSnapEnabled, onSnapAll } = props;
   const [open, setOpen] = useState(false);
   
   return (
@@ -42,6 +43,7 @@ export function Toolbar(props: ToolbarProps) {
         </div>
         <div className="hidden lg:flex items-center gap-1">
           <IconButton label="Exporter JSON" onClick={onExportJson} icon={<FileDown className="h-4 w-4"/>} />
+          <IconButton label="Éditer JSON" onClick={onEditJson} icon={<CodeIcon className="h-4 w-4"/>} />
           <IconButton label="Importer JSON" onClick={onImportJson} icon={<FileUp className="h-4 w-4"/>} />
           <IconButton label="Effacer le diagramme" onClick={onClear} icon={<Eraser className="h-4 w-4"/>} />
         </div>

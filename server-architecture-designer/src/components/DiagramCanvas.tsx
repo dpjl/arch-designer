@@ -34,6 +34,7 @@ import EdgeOverlapOverlay from './diagram/EdgeOverlapOverlay';
 import { computeOverlapSegments } from './diagram/edge-overlap';
 import ResponsiveTopBar from './diagram/ResponsiveTopBar';
 import MobileMenu from './diagram/MobileMenu';
+import JsonEditorDialog, { DiagramJsonPayload } from './diagram/JsonEditorDialog';
 import { AutoLayoutProvider, DEFAULT_GLOBAL_AUTO_LAYOUT } from '@/contexts/AutoLayoutContext';
 import { AutoLayoutConfig } from '@/types/diagram';
 import { ThemeProvider } from './theme/ThemeProvider';
@@ -330,6 +331,8 @@ function DiagramCanvas({
   const { applyAutoLayout, isNodeLocked } = useAutoLayout(globalAutoLayoutConfig);
   
   const [isDark, setIsDark] = useState(false);
+  const [jsonEditorOpen, setJsonEditorOpen] = useState(false);
+  const [jsonInitialPayload, setJsonInitialPayload] = useState<DiagramJsonPayload | null>(null);
   useEffect(()=>{
     const mq = window.matchMedia('(prefers-color-scheme: dark)');
     const update = () => setIsDark(document.documentElement.classList.contains('dark') || mq.matches);
@@ -1277,6 +1280,23 @@ function DiagramCanvas({
     URL.revokeObjectURL(url);
   }, [nodes, edges, groups, globalAutoLayoutConfig]);
 
+  const openJsonEditor = useCallback(() => {
+    const snapshot: DiagramJsonPayload = { nodes, edges, groups, instanceGroups, globalAutoLayoutConfig } as any;
+    setJsonInitialPayload(snapshot);
+    setJsonEditorOpen(true);
+  }, [nodes, edges, groups, instanceGroups, globalAutoLayoutConfig]);
+  const applyJsonEditor = useCallback((payload: DiagramJsonPayload) => {
+    setNodes(payload.nodes as any);
+    setEdges(payload.edges as any);
+    if (Array.isArray(payload.groups)) setGroups(payload.groups as any);
+    if (Array.isArray(payload.instanceGroups)) setInstanceGroups(payload.instanceGroups as any);
+    if (payload.globalAutoLayoutConfig) onUpdateGlobalAutoLayoutConfig(payload.globalAutoLayoutConfig as any);
+    try {
+      historyRef.current = { past: [], present: { nodes: payload.nodes, edges: payload.edges }, future: [] } as any;
+      localStorage.setItem(HISTORY_STORAGE_KEY, JSON.stringify(historyRef.current));
+    } catch {}
+  }, [setNodes, setEdges, setGroups, setInstanceGroups, onUpdateGlobalAutoLayoutConfig]);
+
   // Import nodes+edges+groups+global config JSON from file
   const onImportJson = useCallback(() => {
     const input = document.createElement('input');
@@ -1552,6 +1572,7 @@ function DiagramCanvas({
             onExportJson={onExportJson}
             onImportJson={onImportJson}
             onPrintDiagram={onPrintDiagram}
+            onEditJson={openJsonEditor}
             onClear={onClear}
             onUndo={undo}
             onRedo={redo}
@@ -1562,6 +1583,12 @@ function DiagramCanvas({
             onSnapAll={onSnapAll}
           />
         </div>
+        <JsonEditorDialog
+          open={jsonEditorOpen}
+          initialValue={jsonInitialPayload || { nodes, edges, groups, instanceGroups, globalAutoLayoutConfig } as any}
+          onClose={()=>setJsonEditorOpen(false)}
+          onApply={(p)=>{ applyJsonEditor(p); setJsonEditorOpen(false); }}
+        />
 
         <div className="flex gap-4 p-2 sm:p-4 h-[calc(100vh-64px)] relative">
           {/* Left Panel */}
