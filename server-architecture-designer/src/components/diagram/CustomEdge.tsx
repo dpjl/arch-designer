@@ -183,20 +183,18 @@ const CustomEdge = memo(({
   const strokeWidth = selected ? (data?.isNetworkLink ? 4 : 3) : (data?.isNetworkLink ? 3 : 2);
   const safeEdgeColor = edgeColor || '#64748b';
 
+  // Overlaps are rendered globally by OverlapsOverlay
+
   return (
     <g className={`react-flow__edge ${selected ? 'selected' : ''} ${data?.isNetworkLink ? 'network-link-edge' : 'custom-edge'}`}>
       {/* Invisible wider path for easier selection */}
       <path
         d={String(edgePath)}
         stroke="transparent"
-        strokeWidth={Math.max(20, strokeWidth * 4)} // Minimum 20px wide hit area
+        strokeWidth={Math.max(20, strokeWidth * 4)}
         fill="none"
-        style={{ 
-          cursor: 'pointer',
-          pointerEvents: 'stroke' // Only the stroke area is clickable
-        }}
+        style={{ cursor: 'pointer', pointerEvents: 'stroke' }}
       />
-      
       {/* Visible path */}
       <path
         id={id}
@@ -204,12 +202,12 @@ const CustomEdge = memo(({
           ...style,
           stroke: safeEdgeColor,
           strokeWidth,
-          pointerEvents: 'none' // Prevent double click events
+          pointerEvents: 'none'
         }}
         className="react-flow__edge-path"
-  fill="none"
-  strokeLinecap="round"
-  strokeLinejoin="round"
+        fill="none"
+        strokeLinecap="round"
+        strokeLinejoin="round"
         d={String(edgePath)}
         markerEnd={markerEnd && typeof markerEnd === 'object' && 'type' in markerEnd ? `url(#${(markerEnd as any).type})` : undefined}
       />

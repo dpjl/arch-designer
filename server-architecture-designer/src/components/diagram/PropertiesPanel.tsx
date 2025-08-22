@@ -833,12 +833,14 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
                     </select>
                   </div>
                   <div className="space-y-1">
-                    <Label className="text-xs">Position ({Math.round((selection.data?.sourceAnchor?.offset || 0.5) * 100)}%)</Label>
+                    {(() => { const off = selection.data?.sourceAnchor?.offset ?? 0.5; const pct = (off * 100).toFixed(2); return (
+                      <Label className="text-xs">Position ({pct}%)</Label>
+                    ); })()}
                     <input
                       type="range"
                       min="0"
                       max="1"
-                      step="0.01"
+                      step="0.0001"
                       value={selection.data?.sourceAnchor?.offset || 0.5}
                       onChange={(e) => onChange({ 
                         data: { 
@@ -852,6 +854,22 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
                       })}
                       className="w-full"
                     />
+                    <div className="flex items-center gap-2">
+                      <Input
+                        type="number"
+                        className="h-7 w-24 text-xs"
+                        min={0}
+                        max={100}
+                        step={0.01}
+                        value={((selection.data?.sourceAnchor?.offset ?? 0.5) * 100).toFixed(2)}
+                        onChange={(e)=> {
+                          const v = Math.min(100, Math.max(0, parseFloat(e.target.value))); 
+                          const frac = isNaN(v) ? 0.5 : (v/100);
+                          onChange({ data: { ...selection.data, sourceAnchor: { nodeId: selection.source, side: selection.data?.sourceAnchor?.side || 'right', offset: frac } } });
+                        }}
+                      />
+                      <span className="text-[11px] text-slate-500">%</span>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -883,12 +901,14 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
                     </select>
                   </div>
                   <div className="space-y-1">
-                    <Label className="text-xs">Position ({Math.round((selection.data?.targetAnchor?.offset || 0.5) * 100)}%)</Label>
+                    {(() => { const off = selection.data?.targetAnchor?.offset ?? 0.5; const pct = (off * 100).toFixed(2); return (
+                      <Label className="text-xs">Position ({pct}%)</Label>
+                    ); })()}
                     <input
                       type="range"
                       min="0"
                       max="1"
-                      step="0.01"
+                      step="0.0001"
                       value={selection.data?.targetAnchor?.offset || 0.5}
                       onChange={(e) => onChange({ 
                         data: { 
@@ -902,6 +922,22 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
                       })}
                       className="w-full"
                     />
+                    <div className="flex items-center gap-2">
+                      <Input
+                        type="number"
+                        className="h-7 w-24 text-xs"
+                        min={0}
+                        max={100}
+                        step={0.01}
+                        value={((selection.data?.targetAnchor?.offset ?? 0.5) * 100).toFixed(2)}
+                        onChange={(e)=> {
+                          const v = Math.min(100, Math.max(0, parseFloat(e.target.value))); 
+                          const frac = isNaN(v) ? 0.5 : (v/100);
+                          onChange({ data: { ...selection.data, targetAnchor: { nodeId: selection.target, side: selection.data?.targetAnchor?.side || 'left', offset: frac } } });
+                        }}
+                      />
+                      <span className="text-[11px] text-slate-500">%</span>
+                    </div>
                   </div>
                 </div>
               </div>

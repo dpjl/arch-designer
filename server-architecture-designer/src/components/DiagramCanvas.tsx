@@ -30,6 +30,8 @@ import { Button } from "@/components/ui/button";
 import { useGroups } from '@/contexts/GroupsContext';
 import { useInstanceGroups } from '@/contexts/InstanceGroupsContext';
 import { Toolbar, PropertiesPanel, PalettePanel, ComponentNode, DoorNode, NetworkNode, NetworkLinkEdge, CustomEdge, MODES, GRID_SIZE, CONTAINER_HEADER_HEIGHT, NETWORK_HEADER_HEIGHT, DEFAULT_DOOR_WIDTH, DEFAULT_DOOR_HEIGHT, HISTORY_STORAGE_KEY, SNAP_STORAGE_KEY, hexToRgba, autoTextColor, isAncestor, updateNetworkLinksForService, isNetworkLink, useAutoLayout } from './diagram';
+import EdgeOverlapOverlay from './diagram/EdgeOverlapOverlay';
+import { computeOverlapSegments } from './diagram/edge-overlap';
 import ResponsiveTopBar from './diagram/ResponsiveTopBar';
 import MobileMenu from './diagram/MobileMenu';
 import { AutoLayoutProvider, DEFAULT_GLOBAL_AUTO_LAYOUT } from '@/contexts/AutoLayoutContext';
@@ -37,6 +39,8 @@ import { AutoLayoutConfig } from '@/types/diagram';
 import { ThemeProvider } from './theme/ThemeProvider';
 import { useDiagramHistory } from './diagram/hooks/useDiagramHistory';
 import { useDiagramSelection } from './diagram/hooks/useDiagramSelection';
+import { useViewModePan } from './diagram/hooks/useViewModePan';
+import { useDiagramShortcuts } from './diagram/hooks/useDiagramShortcuts';
 import { applyZIndexHierarchy, enforceContainerSelectedZ, absolutePosition, headerOffsetFor as headerOffsetForUtil } from './diagram/layout-utils';
 import { applyPatternToEdge } from './diagram/edge-utils';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -60,7 +64,6 @@ import { Input } from "@/components/ui/input";
 //       
 //       {/* Tooltip au survol */}
 //       <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-2 py-1 bg-slate-900/90 text-white text-xs rounded-md opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-10">
-//         {entry.label}
 //         <div className="absolute top-full left-1/2 transform -translate-x-1/2 border-4 border-transparent border-t-slate-900/90"></div>
 //       </div>
 //     </div>
@@ -288,9 +291,11 @@ function DiagramCanvas({
   // expose setter for resize handles inside node components
   useEffect(() => { (window as any).__setDiagramNodes = setNodes; (window as any).__getDiagramNodes = () => nodes; }, [setNodes, nodes]);
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges as any);
+  const overlapSegments = useMemo(() => computeOverlapSegments(nodes as any, edges as any), [nodes, edges]);
   
   const { historyRef, lastCommitRef, commitIfChanged, undo, redo } = useDiagramHistory(setNodes, setEdges, showFlash);
   useEffect(()=>{ (window as any).__showFlash = showFlash; },[showFlash]);
+  // Keyboard shortcuts (undo/redo/select all/save/copy-paste)
   const { selection, setSelection, selectNode } = useDiagramSelection({ setNodes, setEdges, showFlash, enableKeyboardDelete: mode === MODES.EDIT, getNodes: () => nodes, getEdges: () => edges });
   const { applyAutoLayout, isNodeLocked } = useAutoLayout(globalAutoLayoutConfig);
   
@@ -386,7 +391,6 @@ function DiagramCanvas({
   
   // Track changes
   useEffect(()=>{ commitIfChanged(nodes, edges); }, [nodes, edges, commitIfChanged]);
-  useEffect(()=>{ const handler=(e:KeyboardEvent)=>{ if((e.ctrlKey||e.metaKey)&&!e.shiftKey&&e.key.toLowerCase()==='z'){ e.preventDefault(); undo(); } else if((e.ctrlKey||e.metaKey)&&(e.key.toLowerCase()==='y'||(e.shiftKey&&e.key.toLowerCase()==='z'))){ e.preventDefault(); redo(); } }; window.addEventListener('keydown', handler); return ()=> window.removeEventListener('keydown', handler); },[undo,redo]);
   // Keyboard delete handled inside useDiagramSelection when enabled (disabled here for duplication avoidance)
 
   // Node selection handled by hook
@@ -1365,6 +1369,7 @@ function DiagramCanvas({
     input.click();
   }, [setNodes, setEdges, setSelection, setGroups, setInstanceGroups]);
 
+
   // Drag from palette
   const onEntryDragStart = (event: DragEvent, entry: any) => {
     (event.dataTransfer as DataTransfer).setData("application/x-id", entry.id);
@@ -1445,6 +1450,21 @@ function DiagramCanvas({
     setSelection(null);
   }, [nodes, setNodes, setEdges, setSelection, collectDescendants]);
   useEffect(()=>{ (window as any).__deleteNodesCascade = deleteNodesCascade; }, [deleteNodesCascade]);
+  useDiagramShortcuts({
+    mode,
+    MODES,
+    undo,
+    redo,
+    onSave,
+    selection,
+    setSelection,
+    nodes,
+    edges,
+    setNodes,
+    setEdges,
+    collectDescendants,
+    showFlash,
+  });
   const onNodeDragStartMulti = useCallback((_: any, node: any) => {
     const selIds = nodes.filter(n => n.selected).map(n => n.id);
     const ids = selIds.length ? selIds : [node.id];
@@ -1525,34 +1545,7 @@ function DiagramCanvas({
   }, [mode, setSelection]);
 
   const viewLocked = mode === MODES.VIEW;
-  const [isPanning, setIsPanning] = useState(false);
-  const panLastRef = useRef<{x:number;y:number}|null>(null);
-  const onWrapperMouseDown = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
-    if (!viewLocked) return;
-    // Left button only
-    if (e.button !== 0) return;
-    e.preventDefault();
-    e.stopPropagation();
-    panLastRef.current = { x: e.clientX, y: e.clientY };
-    setIsPanning(true);
-    const move = (ev: MouseEvent) => {
-      const last = panLastRef.current; if (!last) return;
-      const dx = ev.clientX - last.x; const dy = ev.clientY - last.y;
-      panLastRef.current = { x: ev.clientX, y: ev.clientY };
-      try {
-        const vp = getViewport();
-        setViewport({ x: vp.x + dx, y: vp.y + dy, zoom: vp.zoom });
-      } catch {}
-    };
-    const up = () => {
-      setIsPanning(false);
-      panLastRef.current = null;
-      window.removeEventListener('mousemove', move);
-      window.removeEventListener('mouseup', up);
-    };
-    window.addEventListener('mousemove', move);
-    window.addEventListener('mouseup', up);
-  }, [viewLocked, getViewport, setViewport]);
+  const { isPanning, onMouseDown: onWrapperMouseDown } = useViewModePan(viewLocked, getViewport, setViewport);
   const [showLeftPanel, setShowLeftPanel] = useState(true);
   const [showRightPanel, setShowRightPanel] = useState(true);
   // Hydration note: ne pas lire localStorage dans l'initialisation useState
@@ -1693,6 +1686,8 @@ function DiagramCanvas({
                     {mode === MODES.EDIT && (
                       <Background variant={BackgroundVariant.Lines} gap={24} color={isDark ? '#18222b' : '#e2e8f0'} size={1} />
                     )}
+                    {/* Overlay for overlapping straight edges from shared endpoints */}
+                    <EdgeOverlapOverlay segments={overlapSegments} />
                   </ReactFlow>
                 </div>
               </CardContent>

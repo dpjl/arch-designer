@@ -64,6 +64,8 @@ const EdgeHandle = memo(({
 
 const NetworkLinkEdge = memo(({ 
   id, 
+  source,
+  target,
   sourceX, 
   sourceY, 
   targetX, 
@@ -153,6 +155,8 @@ const NetworkLinkEdge = memo(({
         d={edgePath}
         markerEnd={markerEnd && typeof markerEnd === 'object' && 'type' in markerEnd ? `url(#${(markerEnd as any).type})` : undefined}
       />
+
+  {/* Overlap dashes are rendered globally by EdgeOverlapOverlay */}
       
       {/* Aesthetic endpoint dots (always visible) */}
       <circle
