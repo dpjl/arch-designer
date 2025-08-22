@@ -170,7 +170,7 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
                 <SectionTitle>Network</SectionTitle>
                 <div className="space-y-1">
                   <Label>Label</Label>
-                  <Input {...netLabel} />
+                  <Input value={netLabel.value} onChange={netLabel.onChange} onBlur={netLabel.onBlur} onKeyDown={netLabel.onKeyDown} />
                 </div>
                 {/* Partition badges */}
                 <div className="space-y-1">
@@ -294,7 +294,7 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
       {!isDoor && !isNetwork && (
               <div className="space-y-1">
                 <Label>Label</Label>
-        <Input {...nodeLabel} />
+                <Input value={nodeLabel.value} onChange={nodeLabel.onChange} onBlur={nodeLabel.onBlur} onKeyDown={nodeLabel.onKeyDown} />
               </div>
             )}
             {/* Group assignment for service nodes (non-container) */}
@@ -699,7 +699,7 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
                     );
                   })}
                 </div>
-                <Input className="mt-2 text-xs" placeholder="URL personnalisée..." {...iconUrl} />
+                <Input className="mt-2 text-xs" placeholder="URL personnalisée..." value={iconUrl.value} onChange={iconUrl.onChange} onBlur={iconUrl.onBlur} onKeyDown={iconUrl.onKeyDown} />
               </div>
             )}
             {!isDoor && isNode && selection.parentNode && (

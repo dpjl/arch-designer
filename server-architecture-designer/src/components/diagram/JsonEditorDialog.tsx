@@ -120,7 +120,6 @@ export default function JsonEditorDialog({ open, initialValue, onClose, onApply 
     try {
       const parsed = JSON.parse(text);
       setText(JSON.stringify(parsed, null, 2));
-      setDirty(true);
     } catch {
       // ignore format when invalid
     }
