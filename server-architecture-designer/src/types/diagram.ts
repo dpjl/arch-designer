@@ -45,6 +45,15 @@ export interface ContainerNodeData {
   partitions?: number; // number of vertical partitions (default 1)
   partitionIcons?: string[]; // per-partition badge icons (length = partitions)
   partitionBadgeTexts?: string[]; // per-partition text labels shown next to the icon
+  // Visuals
+  bgColor?: string | 'auto';
+  bgOpacity?: number; // 0..1
+  // New: background image overlay (rendered above bgColor)
+  bgImageUrl?: string;
+  bgImageOpacity?: number; // 0..1 (default 0.3)
+  headerPos?: 'top' | 'left';
+  locked?: boolean;
+  isContainer?: true;
 }
 
 export interface NetworkNodeData {

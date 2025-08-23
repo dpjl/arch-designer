@@ -494,6 +494,18 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
                   <button type="button" title="Sablier" onClick={() => onChange({ data:{ features: { ...(selection.data.features||{}), hourglass: !selection.data.features?.hourglass } } })} className={`h-9 w-9 rounded-lg border flex items-center justify-center bg-white hover:bg-slate-50 dark:bg-slate-700 dark:hover:bg-slate-600 ${selection.data.features?.hourglass ? 'ring-2 ring-blue-500 border-blue-400 dark:ring-blue-400 dark:border-blue-400' : 'border-slate-200 dark:border-slate-500'}`}>⏳</button>
                   <button type="button" title="Firewall" onClick={() => onChange({ data:{ features: { ...(selection.data.features||{}), firewall: !selection.data.features?.firewall } } })} className={`h-9 w-9 rounded-lg border flex items-center justify-center bg-white hover:bg-slate-50 dark:bg-slate-700 dark:hover:bg-slate-600 ${selection.data.features?.firewall ? 'ring-2 ring-red-500 border-red-400 dark:ring-red-400 dark:border-red-400' : 'border-slate-200 dark:border-slate-500'}`}>🛡️</button>
                 </div>
+                {selection.data.features?.firewall && (
+                  <div className="mt-2 space-y-1">
+                    <Label>Texte Firewall</Label>
+                    <Input
+                      className="h-8 text-xs"
+                      placeholder="FIREWALL"
+                      value={selection.data.features?.firewallLabel || ''}
+                      onChange={(e)=> onChange({ data: { features: { ...(selection.data.features||{}), firewallLabel: e.target.value } } })}
+                    />
+                    <div className="text-[11px] text-slate-500 dark:text-slate-400">Affiché au-dessus du mur de brique, en petites capitales.</div>
+                  </div>
+                )}
               </div>
             )}
             {!isDoor && !isContainer && !isNetwork && (
@@ -777,6 +789,44 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
                       return <button key={p} type="button" onClick={()=>onChange({ data:{ headerPos:p } })} className={`px-2 h-7 rounded-md text-[11px] border capitalize ${active?'bg-blue-500 text-white border-blue-500 dark:bg-blue-500 dark:text-white':'bg-slate-100 dark:bg-slate-700 border-slate-300 dark:border-slate-600 hover:bg-slate-200 dark:hover:bg-slate-600'}`}>{p}</button>;
                     })}
                   </div>
+                </div>
+                {/* Background image overlay */}
+                <div className="space-y-2">
+                  <SectionTitle>Image de fond (overlay)</SectionTitle>
+                  <div className="space-y-1">
+                    <Label>URL</Label>
+                    <div className="flex items-center gap-2">
+                      <Input
+                        className="h-8 text-xs flex-1"
+                        placeholder="https://…/image.png"
+                        value={selection.data.bgImageUrl || ''}
+                        onChange={(e)=> onChange({ data: { bgImageUrl: e.target.value } })}
+                      />
+                      {selection.data.bgImageUrl && (
+                        <button type="button" className="h-8 px-2 rounded-md border text-xs" onClick={()=> onChange({ data: { bgImageUrl: '' } })}>Effacer</button>
+                      )}
+                    </div>
+                    {selection.data.bgImageUrl && (
+                      <div className="mt-2 p-2 rounded-md border bg-white/60 dark:bg-slate-900/30">
+                        <div className="text-[11px] text-muted-foreground mb-1">Aperçu</div>
+                        <div className="relative h-24 rounded-md bg-slate-50 dark:bg-slate-800 overflow-hidden flex items-center justify-center">
+                          <img src={selection.data.bgImageUrl} alt="" className="max-h-full max-w-full object-contain" style={{ opacity: selection.data.bgImageOpacity ?? 0.3 }} />
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                  <div className="flex flex-col gap-1">
+                    <span className="text-[10px] text-muted-foreground">Opacité image {Math.round(((selection.data.bgImageOpacity ?? 0.3))*100)}%</span>
+                    <input
+                      type="range"
+                      min={0}
+                      max={1}
+                      step={0.05}
+                      value={selection.data.bgImageOpacity ?? 0.3}
+                      onChange={(e)=> onChange({ data: { bgImageOpacity: parseFloat(e.target.value) } })}
+                    />
+                  </div>
+                  <div className="text-[11px] text-slate-500 dark:text-slate-400">L’image est affichée au-dessus de la couleur de fond, en conservant son ratio (object-fit: contain).</div>
                 </div>
                 <div>
                   <Button variant="outline" size="sm" className="w-full" onClick={() => onChange({ autoFitContainer: true })}>Auto-fit aux enfants</Button>

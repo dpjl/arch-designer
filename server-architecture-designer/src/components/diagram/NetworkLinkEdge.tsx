@@ -2,6 +2,7 @@
 import React, { memo, useCallback, useMemo, useState } from 'react';
 import { EdgeProps, getBezierPath, getSmoothStepPath, getStraightPath, useReactFlow, Position, EdgeText } from 'reactflow';
 import { useTheme } from '../theme/ThemeProvider';
+import { hexToRgba } from './diagram-helpers';
 import { NetworkLinkData } from './network-link-utils';
 import { calculateAbsoluteNodePosition, calculateAnchorPosition } from './edge-anchoring';
 
@@ -185,17 +186,25 @@ const NetworkLinkEdge = memo(({
       />
 
       {/* Label */}
-    {label && (
-        <EdgeText
-          x={labelX}
-          y={labelY}
-          label={String(label)}
-      labelStyle={{ fontSize: 11, fontWeight: 600, fill: isDark ? '#e2e8f0' : '#0f172a' }}
-          labelShowBg
-          labelBgPadding={[3, 6]}
-          labelBgBorderRadius={4}
-      labelBgStyle={{ fill: isDark ? 'rgba(15,23,42,0.9)' : 'rgba(255,255,255,0.92)', stroke: isDark ? 'rgba(255,255,255,0.12)' : 'rgba(15,23,42,0.15)' }}
-        />
+      {label && (
+        (() => {
+          const hexMatch = String(networkColor || '').match(/#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})\b/);
+          const hexFull = hexMatch ? ('#' + (hexMatch[1].length===3 ? hexMatch[1].split('').map(c=>c+c).join('') : hexMatch[1])) : null;
+          const bgFill = isDark ? 'rgba(15,23,42,1)' : '#ffffff';
+          const bgStroke = hexFull ? hexToRgba(hexFull, isDark ? 0.35 : 0.25) : (isDark ? 'rgba(255,255,255,0.18)' : 'rgba(15,23,42,0.2)');
+          return (
+            <EdgeText
+              x={labelX}
+              y={labelY}
+              label={String(label)}
+              labelStyle={{ fontSize: 11, fontWeight: 600, fill: isDark ? '#e2e8f0' : '#0f172a' }}
+              labelShowBg
+              labelBgPadding={[4, 8]}
+              labelBgBorderRadius={4}
+              labelBgStyle={{ fill: bgFill, stroke: bgStroke }}
+            />
+          );
+        })()
       )}
 
   {/* Overlap dashes are rendered globally by EdgeOverlapOverlay */}

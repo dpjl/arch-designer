@@ -64,6 +64,8 @@ const ComponentNode = memo(({ id, data, selected, isConnectable }: ComponentNode
   const { resolvedTheme } = useTheme();
   const isDark = resolvedTheme === 'dark';
   const { label = 'Component', icon, color, features = {}, bgColor, bgOpacity = 1, isContainer = false, width = 520, height = 320, locked = false, widthMode = 'fixed', customWidth, groupId, compact: compactFlag } = data || {};
+  const bgImageUrl: string | undefined = (data?.bgImageUrl || '').trim() || undefined;
+  const bgImageOpacity: number = typeof data?.bgImageOpacity === 'number' ? Math.max(0, Math.min(1, data.bgImageOpacity)) : 0.3;
   const isCompact = !!compactFlag;
   const { getById } = useGroups();
   const group = groupId ? getById(groupId) : undefined;
@@ -123,6 +125,7 @@ const ComponentNode = memo(({ id, data, selected, isConnectable }: ComponentNode
   const labelFg = autoTextColor(baseBg || '#ffffff');
   const handleSize = 16;
   const showHandles = isContainer && selected && !locked;
+  const firewallLabel = String((data?.features?.firewallLabel ?? 'FIREWALL') || 'FIREWALL');
 
   const startResize = (e: React.MouseEvent, dir: string) => {
     if (!isContainer) return;
@@ -183,26 +186,26 @@ const ComponentNode = memo(({ id, data, selected, isConnectable }: ComponentNode
             <div className="fw-bottom" />
             <div className="fw-left" />
             <div className="fw-right" />
-            <div className="fw-badge" title="Firewall activé" aria-label="firewall">
-              <svg viewBox="0 0 32 32" role="img" aria-hidden="true">
-                <defs>
-                  <linearGradient id="fwShieldGradL" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="#fef3c7" />
-                    <stop offset="100%" stopColor="#f59e0b" />
-                  </linearGradient>
-                  <linearGradient id="fwShieldGradD" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="#78350f" />
-                    <stop offset="100%" stopColor="#92400e" />
-                  </linearGradient>
-                </defs>
-                <path fill="url(#fwShieldGradL)" stroke="#b45309" strokeWidth="1.5" d="M16 3.5c-.4 0-.8.08-1.18.24l-7.4 3.1c-.57.24-.94.8-.94 1.42 0 9.3 5.2 14.9 9.3 17.45.73.46 1.61.46 2.34 0 3.54-2.2 8.4-7.55 8.4-17.45 0-.62-.37-1.18-.94-1.42l-7.4-3.1A3 3 0 0 0 16 3.5Z" />
-                <path fill="url(#fwShieldGradD)" d="M16 6.2c-.27 0-.54.06-.78.17l-5.4 2.3c-.32.13-.52.44-.52.78 0 6.9 4 11.2 6.7 13 .3.2.68.2.98 0 2.44-1.52 6.12-5.29 6.12-13 0-.34-.2-.65-.52-.79l-5.4-2.29c-.24-.11-.5-.17-.78-.17Z" opacity=".9" />
-                <path fill="#fff" fillOpacity="0.9" d="M15 10.25c0-.41.34-.75.75-.75s.75.34.75.75v5.7a.75.75 0 0 1-1.5 0v-5.7Zm.75 8.1c-.55 0-1 .44-1 1s.45 1 1 1c.56 0 1-.44 1-1s-.44-1-1-1Z" />
-              </svg>
+            <div className="fw-badge fw-badge--rect" title="Firewall activé" aria-label="firewall">
+              <div className="fw-rect">
+                <svg viewBox="0 0 32 32" role="img" aria-hidden="true">
+                  <path d="M16 3 L27 7 V14 C27 20.5 22.5 25.7 16 29 C9.5 25.7 5 20.5 5 14 V7 Z" fill="#ffffff" stroke="#000000" strokeWidth="1.8" />
+                </svg>
+              </div>
             </div>
+            <div className="fw-label" aria-hidden="true">{firewallLabel}</div>
           </div>
         )}
   <div className={`rounded-2xl overflow-hidden relative ${selected ? 'container-sel' : ''}`} data-partitions={partitions} style={{ width: '100%', height: '100%', border: `1px solid ${borderColor}`, background: bg, paddingTop: headerPos==='top'?CONTAINER_HEADER_HEIGHT:0, paddingLeft: headerPos==='left'?CONTAINER_HEADER_HEIGHT:0 }}>
+          {/* Optional background image overlay (fills best while preserving aspect) */}
+          {bgImageUrl && (
+            <div className="absolute inset-0 pointer-events-none" aria-hidden>
+              {/* Use two layers: a dimmer layer for better contrast and the image with configured opacity */}
+              <img src={bgImageUrl} alt=""
+                   className="absolute inset-0 w-full h-full object-contain"
+                   style={{ opacity: bgImageOpacity, filter: 'saturate(0.95)' }} />
+            </div>
+          )}
           {headerPos==='top' && (
           <div className="absolute top-0 left-0 right-0 flex items-center gap-3 px-3 py-2 bg-white/90 dark:bg-slate-900/70 backdrop-blur border-b" style={{ borderColor: borderColor, height: CONTAINER_HEADER_HEIGHT }}>
             {icon ? (
@@ -314,23 +317,14 @@ const ComponentNode = memo(({ id, data, selected, isConnectable }: ComponentNode
             <div className="fw-bottom" />
             <div className="fw-left" />
             <div className="fw-right" />
-            <div className="fw-badge" title="Firewall activé" aria-label="firewall">
-              <svg viewBox="0 0 32 32" role="img" aria-hidden="true">
-                <defs>
-                  <linearGradient id="fwShieldGradL2" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="#fef3c7" />
-                    <stop offset="100%" stopColor="#f59e0b" />
-                  </linearGradient>
-                  <linearGradient id="fwShieldGradD2" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="#78350f" />
-                    <stop offset="100%" stopColor="#92400e" />
-                  </linearGradient>
-                </defs>
-                <path fill="url(#fwShieldGradL2)" stroke="#b45309" strokeWidth="1.5" d="M16 3.5c-.4 0-.8.08-1.18.24l-7.4 3.1c-.57.24-.94.8-.94 1.42 0 9.3 5.2 14.9 9.3 17.45.73.46 1.61.46 2.34 0 3.54-2.2 8.4-7.55 8.4-17.45 0-.62-.37-1.18-.94-1.42l-7.4-3.1A3 3 0 0 0 16 3.5Z" />
-                <path fill="url(#fwShieldGradD2)" d="M16 6.2c-.27 0-.54.06-.78.17l-5.4 2.3c-.32.13-.52.44-.52.78 0 6.9 4 11.2 6.7 13 .3.2.68.2.98 0 2.44-1.52 6.12-5.29 6.12-13 0-.34-.2-.65-.52-.79l-5.4-2.29c-.24-.11-.5-.17-.78-.17Z" opacity=".9" />
-                <path fill="#fff" fillOpacity="0.9" d="M15 10.25c0-.41.34-.75.75-.75s.75.34.75.75v5.7a.75.75 0 0 1-1.5 0v-5.7Zm.75 8.1c-.55 0-1 .44-1 1s.45 1 1 1c.56 0 1-.44 1-1s-.44-1-1-1Z" />
-              </svg>
+            <div className="fw-badge fw-badge--rect" title="Firewall activé" aria-label="firewall">
+              <div className="fw-rect">
+                <svg viewBox="0 0 32 32" role="img" aria-hidden="true">
+                  <path d="M16 3 L27 7 V14 C27 20.5 22.5 25.7 16 29 C9.5 25.7 5 20.5 5 14 V7 Z" fill="#ffffff" stroke="#000000" strokeWidth="1.8" />
+                </svg>
+              </div>
             </div>
+            <div className="fw-label" aria-hidden="true">{firewallLabel}</div>
           </div>
         )}
   { /* Service body */ }
