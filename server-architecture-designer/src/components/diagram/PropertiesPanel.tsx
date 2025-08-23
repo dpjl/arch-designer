@@ -621,29 +621,10 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
                   <Input value={selection.data.allow || ''} placeholder="e.g., HTTPS" onChange={(e) => onChange({ data: { allow: e.target.value } })} />
                   <div className="text-[11px] text-slate-500">Text shown on the door, representing the allowed flow.</div>
                 </div>
-                <div className="pt-2 grid grid-cols-2 gap-2">
-                  <div>
-                    <Label>Width</Label>
-                    <input type="range" min={80} max={240} step={4} value={selection.data.width ?? DEFAULT_DOOR_WIDTH} onChange={(e)=> onChange({ data: { width: parseInt(e.target.value,10) } })} className="w-full" />
-                    <div className="text-[11px] text-slate-500">{selection.data.width ?? DEFAULT_DOOR_WIDTH}px</div>
-                  </div>
-                  <div>
-                    <Label>Scale</Label>
-                    <input type="range" min={0.6} max={2} step={0.05} value={selection.data.scale ?? 1} onChange={(e)=> onChange({ data: { scale: parseFloat(e.target.value) } })} className="w-full" />
-                    <div className="text-[11px] text-slate-500">{Math.round((selection.data.scale ?? 1)*100)}%</div>
-                    <label className="flex items-center gap-2 text-xs mt-1"><input type="checkbox" checked={!!selection.data.lockedIcon} onChange={(e)=> onChange({ data:{ lockedIcon: e.target.checked } })} /> Lock icon</label>
-                  </div>
-                </div>
                 <div className="pt-2">
-                  <Label>Wall Offset</Label>
-                  <input type="range" min={-4} max={4} step={1} value={(selection.data.offset || 0)} onChange={(e)=> {
-                    const v = parseInt(e.target.value,10);
-                    const side = selection.data.side as ('top'|'bottom'|'left'|'right'|undefined);
-                    const nextOffsets:any = { ...(selection.data.offsets||{}) };
-                    if (side) nextOffsets[side] = v; else nextOffsets.top = v;
-                    onChange({ data: { offset: v, offsets: nextOffsets }, resnapDoor: true });
-                  }} className="w-full" />
-                  <div className="text-[11px] text-slate-500">Anchored side: {selection.data.side || 'auto'}</div>
+                  <Label>Width</Label>
+                  <input type="range" min={80} max={240} step={4} value={selection.data.width ?? DEFAULT_DOOR_WIDTH} onChange={(e)=> onChange({ data: { width: parseInt(e.target.value,10) } })} className="w-full" />
+                  <div className="text-[11px] text-slate-500">{selection.data.width ?? DEFAULT_DOOR_WIDTH}px</div>
                 </div>
               </>
             )}

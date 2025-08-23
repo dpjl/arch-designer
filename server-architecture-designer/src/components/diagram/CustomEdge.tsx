@@ -1,6 +1,7 @@
 "use client";
 import React, { memo, useCallback, useMemo } from 'react';
-import { EdgeProps, getBezierPath, getSmoothStepPath, getStraightPath, useReactFlow, Position } from 'reactflow';
+import { EdgeProps, getBezierPath, getSmoothStepPath, getStraightPath, useReactFlow, Position, EdgeText } from 'reactflow';
+import { useTheme } from '../theme/ThemeProvider';
 import { EdgeAnchorData, calculateAnchorPosition, calculateAbsoluteNodePosition } from './edge-anchoring';
 
 interface CustomEdgeProps extends EdgeProps {
@@ -79,9 +80,12 @@ const CustomEdge = memo(({
   data,
   style,
   markerEnd,
-  selected
+  selected,
+  label
 }: CustomEdgeProps) => {
   const { getNodes } = useReactFlow();
+  const { resolvedTheme } = useTheme();
+  const isDark = resolvedTheme === 'dark';
   
   // Calculate actual connection points based on anchors
   const connectionPoints = useMemo(() => {
@@ -180,21 +184,13 @@ const CustomEdge = memo(({
 
   // Determine edge color
   const edgeColor = data?.isNetworkLink ? data.networkColor : (style?.stroke || '#64748b');
-  const strokeWidth = selected ? (data?.isNetworkLink ? 4 : 3) : (data?.isNetworkLink ? 3 : 2);
+  const strokeWidth = (typeof style?.strokeWidth === 'number' ? style!.strokeWidth as number : (data?.isNetworkLink ? 3 : 2));
   const safeEdgeColor = edgeColor || '#64748b';
 
   // Overlaps are rendered globally by EdgeOverlapOverlay
 
   return (
     <g className={`react-flow__edge ${selected ? 'selected' : ''} ${data?.isNetworkLink ? 'network-link-edge' : 'custom-edge'}`}>
-      {/* Invisible wider path for easier selection */}
-      <path
-        d={String(edgePath)}
-        stroke="transparent"
-        strokeWidth={Math.max(20, strokeWidth * 4)}
-        fill="none"
-        style={{ cursor: 'pointer', pointerEvents: 'stroke' }}
-      />
       {/* Visible path */}
       <path
         id={id}
@@ -211,6 +207,34 @@ const CustomEdge = memo(({
         d={String(edgePath)}
         markerEnd={markerEnd && typeof markerEnd === 'object' && 'type' in markerEnd ? `url(#${(markerEnd as any).type})` : undefined}
       />
+
+      {/* Wide transparent hit area ABOVE the visible stroke for easier selection (works with dashed/animated) */}
+      <path
+        d={String(edgePath)}
+        stroke="rgba(0,0,0,0.001)"
+        strokeWidth={Math.max(20, (strokeWidth || 2) * 4)}
+        fill="none"
+        strokeLinecap="round"
+        style={{ cursor: 'pointer', pointerEvents: 'stroke' }}
+      />
+
+      {/* Label */}
+  {label && (
+        <EdgeText
+          x={labelX}
+          y={labelY}
+          label={String(label)}
+          labelStyle={{
+    fontSize: 11,
+    fontWeight: 600,
+    fill: isDark ? '#e2e8f0' : '#0f172a'
+          }}
+          labelShowBg
+          labelBgPadding={[3, 6]}
+          labelBgBorderRadius={4}
+      labelBgStyle={{ fill: isDark ? 'rgba(15,23,42,0.9)' : 'rgba(255,255,255,0.92)', stroke: isDark ? 'rgba(255,255,255,0.12)' : 'rgba(15,23,42,0.15)' }}
+        />
+      )}
       
       {/* Simple anchor indicators when selected and custom anchors are active */}
       {selected && (data?.sourceAnchor || data?.targetAnchor) && (

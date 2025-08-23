@@ -1,6 +1,7 @@
 "use client";
 import React, { memo, useCallback, useMemo, useState } from 'react';
-import { EdgeProps, getBezierPath, getSmoothStepPath, getStraightPath, useReactFlow, Position } from 'reactflow';
+import { EdgeProps, getBezierPath, getSmoothStepPath, getStraightPath, useReactFlow, Position, EdgeText } from 'reactflow';
+import { useTheme } from '../theme/ThemeProvider';
 import { NetworkLinkData } from './network-link-utils';
 import { calculateAbsoluteNodePosition, calculateAnchorPosition } from './edge-anchoring';
 
@@ -87,10 +88,13 @@ const NetworkLinkEdge = memo(({
   data,
   style,
   markerEnd,
-  selected
+  selected,
+  label
 }: NetworkLinkEdgeProps) => {
   const { networkColor, networkId } = data;
   const { getNodes } = useReactFlow();
+  const { resolvedTheme } = useTheme();
+  const isDark = resolvedTheme === 'dark';
   
   // Compute actual connection points honoring saved anchors
   const connectionPoints = useMemo(() => {
@@ -150,25 +154,13 @@ const NetworkLinkEdge = memo(({
 
   return (
     <g className={`react-flow__edge ${selected ? 'selected' : ''} network-link-edge`}>
-      {/* Invisible wider path for easier selection */}
-      <path
-        d={edgePath}
-        stroke="transparent"
-        strokeWidth={Math.max(20, (selected ? 4 : 3) * 4)} // Minimum 20px wide hit area
-        fill="none"
-        style={{ 
-          cursor: 'pointer',
-          pointerEvents: 'stroke' // Only the stroke area is clickable
-        }}
-      />
-      
       {/* Visible path */}
       <path
         id={id}
         style={{
           ...style,
           stroke: networkColor,
-          strokeWidth: selected ? 4 : 3,
+          strokeWidth: (typeof style?.strokeWidth === 'number' ? (style!.strokeWidth as number) : 3),
           pointerEvents: 'none' // Prevent double click events
         }}
         className="react-flow__edge-path"
@@ -178,6 +170,33 @@ const NetworkLinkEdge = memo(({
         d={edgePath}
         markerEnd={markerEnd && typeof markerEnd === 'object' && 'type' in markerEnd ? `url(#${(markerEnd as any).type})` : undefined}
       />
+
+      {/* Wide transparent hit area ABOVE the visible stroke for easier selection (works with dashed/animated) */}
+      <path
+        d={edgePath}
+        stroke="rgba(0,0,0,0.001)"
+        strokeWidth={Math.max(20, ((typeof style?.strokeWidth === 'number' ? (style!.strokeWidth as number) : 3)) * 4)}
+        fill="none"
+        strokeLinecap="round"
+        style={{ 
+          cursor: 'pointer',
+          pointerEvents: 'stroke'
+        }}
+      />
+
+      {/* Label */}
+    {label && (
+        <EdgeText
+          x={labelX}
+          y={labelY}
+          label={String(label)}
+      labelStyle={{ fontSize: 11, fontWeight: 600, fill: isDark ? '#e2e8f0' : '#0f172a' }}
+          labelShowBg
+          labelBgPadding={[3, 6]}
+          labelBgBorderRadius={4}
+      labelBgStyle={{ fill: isDark ? 'rgba(15,23,42,0.9)' : 'rgba(255,255,255,0.92)', stroke: isDark ? 'rgba(255,255,255,0.12)' : 'rgba(15,23,42,0.15)' }}
+        />
+      )}
 
   {/* Overlap dashes are rendered globally by EdgeOverlapOverlay */}
       

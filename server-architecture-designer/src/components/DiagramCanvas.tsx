@@ -180,22 +180,30 @@ function getBrickTexture(): { urlH: string; urlV: string; size: number; offX: nu
 }
 
 
-// Door helpers (kept for placement logic only)
+// Door helpers (precise firewall ring anchoring)
 const CONTAINER_RING_THICKNESS = 14;
 const CONTAINER_RING_GAP = 8;
+// Very slight inward offset so the door visually sits inside the brick wall
+const DOOR_INSET = 6; // px (tiny, but noticeable)
 function clamp(val:number, min:number, max:number){ return Math.max(min, Math.min(max, val)); }
-function placeDoorOnSide(parent:any, side:'top'|'bottom'|'left'|'right', localPos:{x:number;y:number}, doorW:number, doorH:number, offsets?: { top?: number; bottom?: number; left?: number; right?: number }){
-  const w = parent?.data?.width || 520; const h = parent?.data?.height || 320; let x=localPos.x,y=localPos.y; const ftTop=offsets?.top??0, ftBottom=offsets?.bottom??0, ftLeft=offsets?.left??0, ftRight=offsets?.right??0;
+function placeDoorOnSide(parent:any, side:'top'|'bottom'|'left'|'right', localPos:{x:number;y:number}, doorW:number, doorH:number){
+  const w = parent?.data?.width || 520; const h = parent?.data?.height || 320; let x=localPos.x,y=localPos.y;
+  // Center the door on the middle of the firewall ring band, no manual offsets.
+  const mid = CONTAINER_RING_GAP + CONTAINER_RING_THICKNESS/2;
   switch(side){
-    case 'top': y=-(CONTAINER_RING_GAP+CONTAINER_RING_THICKNESS/2)-doorH/2+ftTop; x=clamp(x,-doorW/2,w-doorW/2); break;
-    case 'bottom': y=h-(CONTAINER_RING_GAP+CONTAINER_RING_THICKNESS/2)-doorH/2-ftBottom; x=clamp(x,-doorW/2,w-doorW/2); break;
-    case 'left': x=-(CONTAINER_RING_GAP+CONTAINER_RING_THICKNESS/2)-doorW/2+ftLeft; y=clamp(y,-doorH/2,h-doorH/2); break;
-    case 'right': x=w-(CONTAINER_RING_GAP+CONTAINER_RING_THICKNESS/2)-doorW/2-ftRight; y=clamp(y,-doorH/2,h-doorH/2); break;
+  case 'top': y = -mid - doorH/2 + DOOR_INSET; x = clamp(x, -doorW/2, w - doorW/2); break;      // push slightly downward (inside)
+  case 'bottom': y = h + mid - doorH/2 - DOOR_INSET; x = clamp(x, -doorW/2, w - doorW/2); break; // push slightly upward (inside)
+  case 'left': x = -mid - doorW/2 + DOOR_INSET; y = clamp(y, -doorH/2, h - doorH/2); break;      // push slightly right (inside)
+  case 'right': x = w + mid - doorW/2 - DOOR_INSET; y = clamp(y, -doorH/2, h - doorH/2); break;  // push slightly left (inside)
   }
   return { side, position:{x,y} };
 }
-function snapDoorToNearestSide(parent: any, localPos: {x:number;y:number}, doorW: number, doorH: number, offsets?: { top?: number; bottom?: number; left?: number; right?: number }) {
-  const w = parent?.data?.width || 520; const h = parent?.data?.height || 320; const dx = Math.min(localPos.x, w-localPos.x); const dy = Math.min(localPos.y, h-localPos.y); let side:'top'|'bottom'|'left'|'right'='top'; if(dy<=dx) side = (localPos.y < h/2)?'top':'bottom'; else side=(localPos.x < w/2)?'left':'right'; return placeDoorOnSide(parent, side, localPos, doorW, doorH, offsets);
+function snapDoorToNearestSide(parent: any, localPos: {x:number;y:number}, doorW: number, doorH: number) {
+  const w = parent?.data?.width || 520; const h = parent?.data?.height || 320;
+  const dx = Math.min(localPos.x, w-localPos.x); const dy = Math.min(localPos.y, h-localPos.y);
+  let side:'top'|'bottom'|'left'|'right'='top';
+  if (dy <= dx) side = (localPos.y < h/2) ? 'top' : 'bottom'; else side = (localPos.x < w/2) ? 'left' : 'right';
+  return placeDoorOnSide(parent, side, localPos, doorW, doorH);
 }
 
 // == Node Types Registry =====================================================
@@ -707,17 +715,18 @@ function DiagramCanvas({
 
   if (id === 'door') {
       const parent = findContainerAt(absPos);
-      const parentAbs = parent ? absoluteOf(parent) : null;
-      const header = parent ? headerOffsetFor(parent) : 0;
-      let position = parent ? { x: absPos.x - parentAbs!.x, y: absPos.y - parentAbs!.y - header } : absPos;
+      // Doors can only be created on a container with firewall enabled
+      if (!parent || !(parent.data?.features?.firewall)) {
+        return; // ignore drop outside or without firewall
+      }
+      const parentAbs = absoluteOf(parent);
+      const header = headerOffsetFor(parent);
+      let position = { x: absPos.x - parentAbs.x, y: absPos.y - parentAbs.y - header };
       const nid = `door-${Math.random().toString(36).slice(2, 8)}`;
       let data:any = { idInternal: nid, isDoor: true, label: 'Door', allow: 'HTTPS', width: DEFAULT_DOOR_WIDTH };
-      if (parent) {
-        const snapped = snapDoorToNearestSide(parent, position, DEFAULT_DOOR_WIDTH, DEFAULT_DOOR_HEIGHT, data?.offsets);
-        position = snapped.position;
-        data.side = snapped.side;
-      }
-      const newDoor = { id: nid, type: 'door', position, data, parentNode: (parent as any)?.id, extent: parent ? ('parent' as const) : undefined } as any;
+      const snapped = snapDoorToNearestSide(parent, position, DEFAULT_DOOR_WIDTH, DEFAULT_DOOR_HEIGHT);
+      position = snapped.position; data.side = snapped.side;
+      const newDoor = { id: nid, type: 'door', position, data, parentNode: parent.id, extent: 'parent' as const } as any;
       setNodes((nds) => nds.concat(newDoor));
       return;
     }
@@ -762,16 +771,16 @@ function DiagramCanvas({
       if (n.id !== node.id) return n;
       // Snap doors to walls and restrict movement along the wall
     if (n.type === 'door') {
-        if (container) {
-          const scale = Math.max(0.6, Math.min(2, (n.data?.scale ?? 1)));
-          const doorW = Math.round((n.data?.width || DEFAULT_DOOR_WIDTH) * scale);
-          const doorH = Math.round(DEFAULT_DOOR_HEIGHT * scale);
-          const containerAbs = absoluteOf(container);
-          const snapped = snapDoorToNearestSide(container, { x: absPos.x - containerAbs.x, y: absPos.y - containerAbs.y - headerOffsetFor(container) }, doorW, doorH, n.data?.offsets);
-      return { ...n, parentNode: container.id, extent: 'parent', position: snapped.position, data: { ...(n.data||{}), side: snapped.side } };
-        }
-        // door outside container: keep free
-        return n;
+        // Doors stay with their existing container; if none, ignore drag result
+        const originalContainer = n.parentNode ? nds.find(p => p.id === n.parentNode) : undefined;
+        if (!originalContainer) return n;
+        if (!originalContainer.data?.features?.firewall) return n;
+        const doorW = Math.round((n.data?.width || DEFAULT_DOOR_WIDTH));
+        const doorH = DEFAULT_DOOR_HEIGHT;
+        const contAbs = absoluteOf(originalContainer);
+        const local = { x: absPos.x - contAbs.x, y: absPos.y - contAbs.y - headerOffsetFor(originalContainer) };
+        const snapped = snapDoorToNearestSide(originalContainer, local, doorW, doorH);
+        return { ...n, parentNode: originalContainer.id, extent: 'parent', position: snapped.position, data: { ...(n.data||{}), side: snapped.side } };
       }
       if (container) {
         // Already inside same container: no recompute (prevents cumulative shift)
@@ -1040,28 +1049,20 @@ function DiagramCanvas({
           setEdges((eds) => updateNetworkLinksForService(eds, nodes, selection.id, networkIds, networkColorMap, autoLinkEnabled));
         }
       }
-      // optional: resnap door immediately when offsets change
-      if (patch?.resnapDoor) {
-        setNodes((nds) => nds.map((n) => {
-          if (n.id !== selection.id || n.type !== 'door' || !n.parentNode) return n;
-          const parent = nds.find(p => p.id === n.parentNode);
-          if (!parent) return n;
-          const scale = Math.max(0.6, Math.min(2, (n.data?.scale ?? 1)));
-          const doorW = Math.round((n.data?.width || DEFAULT_DOOR_WIDTH) * scale);
-          const doorH = Math.round(DEFAULT_DOOR_HEIGHT * scale);
-          const snapped = snapDoorToNearestSide(parent, n.position, doorW, doorH, n.data?.offsets);
-          return { ...n, position: snapped.position, data: { ...(n.data||{}), side: snapped.side } };
-        }));
-        setSelection((s:any) => {
-          if (!s || s.type !== 'node' || s.id !== selection.id || !s.parentNode) return s;
-          const parent = nodes.find(n => n.id === s.parentNode);
-          if (!parent) return s;
-          const scale = Math.max(0.6, Math.min(2, (s.data?.scale ?? 1)));
-          const doorW = Math.round((s.data?.width || DEFAULT_DOOR_WIDTH) * scale);
-          const doorH = Math.round(DEFAULT_DOOR_HEIGHT * scale);
-          const snapped = snapDoorToNearestSide(parent, s.position, doorW, doorH, s.data?.offsets);
-          return { ...s, position: snapped.position, data: { ...(s.data||{}), side: snapped.side } };
-        });
+      // When door width changes via properties, resnap precisely
+      if (patch?.data && selection?.type === 'node' && selection.nodeType !== 'edge') {
+        const changedWidth = Object.prototype.hasOwnProperty.call(patch.data, 'width');
+        if (changedWidth) {
+          setNodes((nds) => nds.map((n) => {
+            if (n.id !== selection.id || n.type !== 'door' || !n.parentNode) return n;
+            const parent = nds.find(p => p.id === n.parentNode);
+            if (!parent) return n;
+            const doorW = Math.round((patch.data?.width ?? n.data?.width ?? DEFAULT_DOOR_WIDTH));
+            const doorH = DEFAULT_DOOR_HEIGHT;
+            const snapped = snapDoorToNearestSide(parent, n.position, doorW, doorH);
+            return { ...n, position: snapped.position, data: { ...(n.data||{}), side: snapped.side } };
+          }));
+        }
       }
   // keep explicit edge color only if user changes it via edge properties
     } else {
@@ -1362,6 +1363,9 @@ function DiagramCanvas({
     }
     
     if (evt?.altKey && node.parentNode) {
+      if (node.type === 'door') {
+        return; // Doors cannot be detached from their container
+      }
       setNodes((nds) => nds.map((n) => {
         if (n.id !== node.id) return n;
         if (!n.parentNode) return n;
@@ -1482,11 +1486,24 @@ function DiagramCanvas({
     if (dx === 0 && dy === 0) return;
     setNodes((nds) => nds.map(n => {
       if (!ref.start[n.id]) return n; // only move captured ones
+      // Doors: while dragging, stay snapped to the firewall ring of their own container
+      if (n.type === 'door') {
+        const parent = n.parentNode ? nds.find(p => p.id === n.parentNode) : undefined;
+        if (!parent) return n;
+        if (!parent.data?.features?.firewall) return n;
+        const doorW = Math.round((n.data?.width || DEFAULT_DOOR_WIDTH));
+        const doorH = DEFAULT_DOOR_HEIGHT;
+        const startLocal = ref.start[n.id];
+        const localX = startLocal.x + dx;
+        const localY = startLocal.y + dy;
+        const snapped = snapDoorToNearestSide(parent, { x: localX, y: localY }, doorW, doorH);
+        return { ...n, position: snapped.position, data: { ...(n as any).data, side: snapped.side } } as any;
+      }
       // propose new position
       let newX = ref.start[n.id].x + dx;
       let newY = ref.start[n.id].y + dy;
-      // If partitioned, clamp X within own partition bounds
-      if (ref.parentId && ref.partitions && ref.partitionWidth && ref.headerLeft !== undefined) {
+  // If partitioned, clamp X within own partition bounds (not for doors)
+  if (n.type !== 'door' && ref.parentId && ref.partitions && ref.partitionWidth && ref.headerLeft !== undefined) {
         const nodeW = (n as any).width || (n as any).data?.width || (n as any).style?.width || 150;
         const pad = 4;
         if (evt?.shiftKey) {

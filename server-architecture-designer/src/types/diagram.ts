@@ -65,9 +65,7 @@ export interface DoorNodeData extends BaseNodeData {
   isDoor: true;
   allow?: string;
   width?: number; // base door width before scaling
-  scale?: number;
   side?: 'top' | 'bottom' | 'left' | 'right';
-  offsets?: { top?: number; bottom?: number; left?: number; right?: number };
 }
 
 export type AnyNodeData = ServiceNodeData | ContainerNodeData | NetworkNodeData | DoorNodeData | Record<string, any>;
