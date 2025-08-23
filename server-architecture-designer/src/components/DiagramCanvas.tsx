@@ -961,41 +961,43 @@ function DiagramCanvas({
             if (!containerNode) return nds;
             const childNodes = nds.filter(n => n.parentNode === selection.id);
             if (childNodes.length === 0) return nds;
+            let next: typeof nds = nds;
             if (containerNode.data?.autoLayout?.enabled) {
               // Appliquer l'auto-layout avec agrandissement automatique si nécessaire
-              return applyAutoLayout(containerNode, childNodes, nds, containerNode.data.autoLayout);
+              next = applyAutoLayout(containerNode, childNodes, nds, containerNode.data.autoLayout);
+            } else {
+              // Sinon, simplement RE-CLAMP dans les partitions
+              const isNet = containerNode.type === 'network';
+              const headerLeft = (containerNode.data?.headerPos||'top')==='left' ? (isNet?NETWORK_HEADER_HEIGHT:CONTAINER_HEADER_HEIGHT) : 0;
+              const width = (containerNode.data?.width||containerNode.style?.width||containerNode.width||520) as number;
+              const parts = Math.max(1, Math.min(12, parseInt(String(containerNode.data?.partitions ?? 1), 10) || 1));
+              const innerW = width - headerLeft;
+              const partW = innerW / parts;
+              const leftPad = 4;
+              next = nds.map(n => {
+                if (n.parentNode !== selection.id) return n;
+                const nodeW = (n as any).width || (n as any).data?.width || (n as any).style?.width || 150;
+                let pIdx = (n as any).data?.parentPartition;
+                if (typeof pIdx !== 'number' || isNaN(pIdx)) {
+                  const localX = Math.max(0, n.position.x - headerLeft);
+                  pIdx = Math.floor(localX / partW);
+                }
+                if (pIdx < 0) pIdx = 0; if (pIdx >= parts) pIdx = parts - 1;
+                const minX = headerLeft + pIdx * partW + leftPad;
+                const maxX = headerLeft + (pIdx + 1) * partW - nodeW - leftPad;
+                const newX = Math.max(minX, Math.min(n.position.x, maxX));
+                return { ...n, position: { x: newX, y: n.position.y }, data: { ...(n.data||{}), parentPartition: pIdx } };
+              });
             }
-            // Sinon, simplement RE-CLAMP dans les partitions
-            const isNet = containerNode.type === 'network';
-            const headerLeft = (containerNode.data?.headerPos||'top')==='left' ? (isNet?NETWORK_HEADER_HEIGHT:CONTAINER_HEADER_HEIGHT) : 0;
-            const width = (containerNode.data?.width||containerNode.style?.width||containerNode.width||520) as number;
-            const parts = Math.max(1, Math.min(12, parseInt(String(containerNode.data?.partitions ?? 1), 10) || 1));
-            const innerW = width - headerLeft;
-            const partW = innerW / parts;
-            const leftPad = 4;
-            return nds.map(n => {
-              if (n.parentNode !== selection.id) return n;
-              const nodeW = (n as any).width || (n as any).data?.width || (n as any).style?.width || 150;
-              let pIdx = (n as any).data?.parentPartition;
-              if (typeof pIdx !== 'number' || isNaN(pIdx)) {
-                const localX = Math.max(0, n.position.x - headerLeft);
-                pIdx = Math.floor(localX / partW);
+            // Mettre à jour la sélection à partir de la version la plus récente du nœud
+            setSelection((s: any) => {
+              if (s && s.id === selection.id) {
+                const updatedNode = next.find(n => n.id === selection.id);
+                return updatedNode ? { ...s, data: updatedNode.data } : s;
               }
-              if (pIdx < 0) pIdx = 0; if (pIdx >= parts) pIdx = parts - 1;
-              const minX = headerLeft + pIdx * partW + leftPad;
-              const maxX = headerLeft + (pIdx + 1) * partW - nodeW - leftPad;
-              const newX = Math.max(minX, Math.min(n.position.x, maxX));
-              return { ...n, position: { x: newX, y: n.position.y }, data: { ...(n.data||{}), parentPartition: pIdx } };
+              return s;
             });
-          });
-          
-          // Mettre à jour la sélection si le conteneur a été redimensionné
-          setSelection((s: any) => {
-            if (s && s.id === selection.id) {
-              const updatedNode = nodes.find(n => n.id === selection.id);
-              return updatedNode ? { ...s, data: updatedNode.data } : s;
-            }
-            return s;
+            return next;
           });
         }, 50); // Petit délai pour que la mise à jour de taille soit appliquée
       }
@@ -1642,6 +1644,8 @@ function DiagramCanvas({
                     onNodeDrag={onNodeDrag}
                     connectionMode={ConnectionMode.Loose}
                     connectionLineType={ConnectionLineType.Straight}
+                    minZoom={0.1}
+                    maxZoom={3}
                     nodesDraggable={mode === MODES.EDIT}
                     nodesConnectable={mode === MODES.EDIT}
                     elementsSelectable={mode === MODES.EDIT}

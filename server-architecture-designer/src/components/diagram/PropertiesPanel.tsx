@@ -43,7 +43,7 @@ function NetworksInlineEditor({ selection, onChange, networks }: any) {
   const ids: string[] = selection?.data?.networks || [];
   const toggle = (id: string) => {
     const next = ids.includes(id) ? ids.filter(x=>x!==id) : ids.concat(id);
-    onChange({ data: { ...selection.data, networks: next } });
+  onChange({ data: { networks: next } });
   };
   return (
     <div className="flex flex-wrap gap-2">
@@ -97,26 +97,80 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
   const isContainer = isNode && !!selection.data?.isContainer;
   const isDoor = isNode && !!selection.data?.isDoor;
   const isNetwork = isNode && selection.nodeType === 'network';
+  // Aspect ratio helpers (shared for containers and networks)
+  const aspect = (selection?.data?.aspect || {}) as { locked?: boolean; ratio?: number; preset?: string; custom?: { w?: number; h?: number } };
+  const presets: { id: string; label: string; ratio?: number }[] = [
+    { id: 'a4p', label: 'A4 portrait', ratio: 210/297 },
+    { id: 'a4l', label: 'A4 paysage', ratio: 297/210 },
+    { id: '1:1', label: '1:1', ratio: 1 },
+    { id: '4:3', label: '4:3', ratio: 4/3 },
+    { id: '16:9', label: '16:9', ratio: 16/9 },
+    { id: 'custom', label: 'Personnalisé' },
+  ];
+  const currentRatio = (() => {
+    if (aspect?.locked && typeof aspect?.ratio === 'number' && aspect.ratio > 0) return aspect.ratio;
+    const w = Number(selection?.data?.width || 0);
+    const h = Number(selection?.data?.height || 0);
+    return w > 0 && h > 0 ? (w / h) : (16/9);
+  })();
+  const handleAspectToggle = (locked: boolean) => {
+    if (!isNode) return;
+    if (locked) {
+      const w = Number(selection?.data?.width || 0);
+      const h = Number(selection?.data?.height || 0);
+      const r = w > 0 && h > 0 ? (w / h) : (16/9);
+      const newH = h > 0 ? Math.max(1, Math.round(w / r)) : Math.round(w / r);
+  onChange({ data: { width: w, height: newH, aspect: { locked: true, ratio: r, preset: undefined, custom: undefined } } });
+    } else {
+  onChange({ data: { aspect: { locked: false } } });
+    }
+  };
+  const applyPreset = (id: string) => {
+    const p = presets.find(x => x.id === id);
+    if (!p) return;
+    if (p.id === 'custom') {
+      const r = (aspect.custom?.w && aspect.custom?.h && aspect.custom.h>0) ? (aspect.custom.w / aspect.custom.h) : currentRatio;
+      const w = Number(selection?.data?.width || 0);
+      const h = Math.max(1, Math.round(w / r));
+  onChange({ data: { width: w, height: h, aspect: { ...(aspect||{}), locked: true, preset: 'custom', ratio: r } } });
+    } else {
+      const r = p.ratio || currentRatio;
+      const w = Number(selection?.data?.width || 0);
+      const h = Math.max(1, Math.round(w / r));
+  onChange({ data: { width: w, height: h, aspect: { locked: true, preset: p.id, ratio: r } } });
+    }
+  };
+  const applyCustomWH = (which: 'w'|'h', value: number) => {
+    const w = which==='w' ? value : (aspect.custom?.w ?? 16);
+    const h = which==='h' ? value : (aspect.custom?.h ?? 9);
+    const safeW = Math.max(1, Math.round(w));
+    const safeH = Math.max(1, Math.round(h));
+    const ratio = safeW / safeH;
+    const curW = Number(selection?.data?.width || 0);
+    const newH = Math.max(1, Math.round(curW / ratio));
+  onChange({ data: { width: curW, height: newH, aspect: { locked: true, preset: 'custom', custom: { w: safeW, h: safeH }, ratio } } });
+  };
   // Stable buffered input for network label
   const netLabel = useStableInput(
     selection?.id || '',
     (isNetwork ? (selection?.data?.label || '') : ''),
-    (val) => { if (isNetwork) onChange({ data: { ...selection.data, label: val } }); }
+  (val) => { if (isNetwork) onChange({ data: { label: val } }); }
   );
   const nodeLabel = useStableInput(
     selection?.id || '',
     (isNode && !isNetwork ? (selection?.data?.label || '') : ''),
-    (val) => { if (isNode && !isNetwork) onChange({ data: { ...selection.data, label: val } }); }
+  (val) => { if (isNode && !isNetwork) onChange({ data: { label: val } }); }
   );
   const iconUrl = useStableInput(
     selection?.id || '',
     (isNode ? (selection?.data?.icon || '') : ''),
-    (val) => { if (isNode) onChange({ data: { ...selection.data, icon: val } }); }
+  (val) => { if (isNode) onChange({ data: { icon: val } }); }
   );
   if ((multiCount || 0) > 1) {
     return (
   <Card className="rounded-2xl text-[13px] bg-white/80 dark:bg-slate-800/80 backdrop-blur border border-slate-200 dark:border-slate-600 dark:shadow-[0_0_0_1px_rgba(255,255,255,0.05)]">
         <CardHeader>
+
           <div className="flex items-center justify-between">
             <CardTitle className="text-base">Multiple selection</CardTitle>
             {onClosePanel && (
@@ -171,6 +225,45 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
                 <div className="space-y-1">
                   <Label>Label</Label>
                   <Input value={netLabel.value} onChange={netLabel.onChange} onBlur={netLabel.onBlur} onKeyDown={netLabel.onKeyDown} />
+                </div>
+                {/* Aspect ratio for networks */}
+                <div className="space-y-1">
+                  <Label>Aspect</Label>
+                  <div className="flex items-center gap-2">
+                    <Checkbox checked={!!aspect.locked} onCheckedChange={(v)=> handleAspectToggle(!!v)} />
+                    <span className="text-xs">Contraindre l’aspect</span>
+                  </div>
+                  {aspect.locked && (
+                    <div className="grid grid-cols-2 gap-2">
+                      <select
+                        className="h-8 px-2 rounded border text-xs dark:bg-slate-700 dark:border-slate-600"
+                        value={aspect.preset && presets.some(p=>p.id===aspect.preset) ? aspect.preset : 'custom'}
+                        onChange={(e)=> applyPreset(e.target.value)}
+                      >
+                        {presets.map(p => (<option key={p.id} value={p.id}>{p.label}</option>))}
+                      </select>
+                      <div className="flex items-center gap-1">
+                        <Input
+                          type="number"
+                          className="h-8 w-16 text-xs"
+                          value={aspect.custom?.w ?? 16}
+                          onChange={(e)=> applyCustomWH('w', parseInt(e.target.value||'0',10) || 1)}
+                          disabled={aspect.preset !== 'custom'}
+                        />
+                        <span className="text-xs">:</span>
+                        <Input
+                          type="number"
+                          className="h-8 w-16 text-xs"
+                          value={aspect.custom?.h ?? 9}
+                          onChange={(e)=> applyCustomWH('h', parseInt(e.target.value||'0',10) || 1)}
+                          disabled={aspect.preset !== 'custom'}
+                        />
+                      </div>
+                    </div>
+                  )}
+                  {aspect.locked && (
+                    <div className="text-[11px] text-slate-500">Ratio: {currentRatio.toFixed(4)}</div>
+                  )}
                 </div>
                 {/* Partition badges */}
                 <div className="space-y-1">
@@ -247,11 +340,11 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
                 </div>
                 <div className="space-y-1">
                   <Label>Color</Label>
-                  <Input type="color" className="h-9 w-10 p-1" value={selection.data.color || '#10b981'} onChange={(e)=> onChange({ data: { ...selection.data, color: e.target.value } })} />
+                  <Input type="color" className="h-9 w-10 p-1" value={selection.data.color || '#10b981'} onChange={(e)=> onChange({ data: { color: e.target.value } })} />
                 </div>
                 <div className="space-y-1">
                   <Label>Text color</Label>
-                  <Input type="color" className="h-9 w-10 p-1" value={selection.data.textColor || autoTextColor(selection.data.color||'#10b981')} onChange={(e)=> onChange({ data: { ...selection.data, textColor: e.target.value } })} />
+                  <Input type="color" className="h-9 w-10 p-1" value={selection.data.textColor || autoTextColor(selection.data.color||'#10b981')} onChange={(e)=> onChange({ data: { textColor: e.target.value } })} />
                 </div>
                 <div className="space-y-1">
                   <Label>Partitions (vertical)</Label>
@@ -262,13 +355,13 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
                     value={selection.data.partitions ?? 1}
                     onChange={(e)=> {
                       let v = parseInt(e.target.value,10); if (isNaN(v)) v = 1; v = Math.max(1, Math.min(12, v));
-                      onChange({ data: { ...selection.data, partitions: v } });
+                      onChange({ data: { partitions: v } });
                     }}
                   />
                 </div>
                 <div className="pt-1 flex items-center gap-2">
                   <span className="text-[11px] text-slate-500 dark:text-slate-400">Header</span>
-                  {['top','left'].map(p=>{ const active=(selection.data.headerPos||'top')===p; return <button key={p} type="button" onClick={()=> onChange({ data:{...selection.data, headerPos:p } })} className={`px-2 h-7 rounded-md text-[11px] border capitalize ${active?'bg-blue-500 text-white border-blue-500 dark:bg-blue-500':'bg-slate-100 dark:bg-slate-700 border-slate-300 dark:border-slate-600 hover:bg-slate-200 dark:hover:bg-slate-600'}`}>{p}</button>; })}
+                  {['top','left'].map(p=>{ const active=(selection.data.headerPos||'top')===p; return <button key={p} type="button" onClick={()=> onChange({ data:{ headerPos:p } })} className={`px-2 h-7 rounded-md text-[11px] border capitalize ${active?'bg-blue-500 text-white border-blue-500 dark:bg-blue-500':'bg-slate-100 dark:bg-slate-700 border-slate-300 dark:border-slate-600 hover:bg-slate-200 dark:hover:bg-slate-600'}`}>{p}</button>; })}
                 </div>
                 <div>
                   <Button variant="outline" size="sm" className="w-full" onClick={() => onChange({ autoFitNetwork: true })}>Ajuster à ses éléments</Button>
@@ -280,13 +373,7 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
                   globalConfig={globalAutoLayoutConfig}
                   onChange={(config) => {
                     // Mise à jour unique avec les nouvelles données ET déclenchement auto-layout
-                    onChange({ 
-                      data: { 
-                        ...selection.data, 
-                        autoLayout: config
-                      },
-                      ...(config.enabled ? { applyAutoLayout: true } : {})
-                    });
+                      onChange({ data: { autoLayout: config }, ...(config.enabled ? { applyAutoLayout: true } : {}) });
                   }}
                 />
               </div>
@@ -352,9 +439,9 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
                     const makeContainer = !!v;
                     if (makeContainer) {
                       const w = selection.data.width || 520; const h = selection.data.height || 320;
-                      onChange({ data: { ...selection.data, isContainer: true, width: w, height: h, bgColor: selection.data.bgColor||'#ffffff', bgOpacity: selection.data.bgOpacity ?? 0.85 } });
+                      onChange({ data: { isContainer: true, width: w, height: h, bgColor: selection.data.bgColor||'#ffffff', bgOpacity: selection.data.bgOpacity ?? 0.85 } });
                     } else {
-                      onChange({ data: { ...selection.data, isContainer: false }, style: { width: undefined, height: undefined } });
+                      onChange({ data: { isContainer: false }, style: { width: undefined, height: undefined } });
                     }
                   }}
                 />
@@ -366,7 +453,7 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
               <div className="flex items-center gap-2 pt-1">
                 <Checkbox
                   checked={!!selection.data.compact}
-                  onCheckedChange={(v) => onChange({ data: { ...selection.data, compact: !!v } })}
+                  onCheckedChange={(v) => onChange({ data: { compact: !!v } })}
                 />
                 <span className="text-xs">Mode compact</span>
               </div>
@@ -379,21 +466,21 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
                     <div className="space-y-1">
                       <span className="text-[10px] text-muted-foreground">Bord</span>
                       <div className="flex items-center gap-1">
-                        <button type="button" onClick={()=> onChange({ data:{ ...selection.data, color: 'auto' } })} className={`px-2 h-8 rounded-md text-[10px] border ${isAuto(selection.data.color)?'bg-blue-500 text-white border-blue-500':'bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600'}`}>Auto</button>
-                        <Input type="color" className="h-8 w-9 p-1" value={isAuto(selection.data.color)? '#94a3b8' : selection.data.color} onChange={(e) => onChange({ data: { ...selection.data, color: e.target.value } })} />
+                        <button type="button" onClick={()=> onChange({ data:{ color: 'auto' } })} className={`px-2 h-8 rounded-md text-[10px] border ${isAuto(selection.data.color)?'bg-blue-500 text-white border-blue-500':'bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600'}`}>Auto</button>
+                        <Input type="color" className="h-8 w-9 p-1" value={isAuto(selection.data.color)? '#94a3b8' : selection.data.color} onChange={(e) => onChange({ data: { color: e.target.value } })} />
                       </div>
                     </div>
                     <div className="space-y-1">
                       <span className="text-[10px] text-muted-foreground">Fond</span>
                       <div className="flex items-center gap-1">
-                        <button type="button" onClick={()=> onChange({ data:{ ...selection.data, bgColor: 'auto' } })} className={`px-2 h-8 rounded-md text-[10px] border ${isAuto(selection.data.bgColor)?'bg-blue-500 text-white border-blue-500':'bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600'}`}>Auto</button>
-                        <Input type="color" className="h-8 w-9 p-1" value={isAuto(selection.data.bgColor)? '#ffffff' : selection.data.bgColor} onChange={(e) => onChange({ data: { ...selection.data, bgColor: e.target.value } })} />
+                        <button type="button" onClick={()=> onChange({ data:{ bgColor: 'auto' } })} className={`px-2 h-8 rounded-md text-[10px] border ${isAuto(selection.data.bgColor)?'bg-blue-500 text-white border-blue-500':'bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600'}`}>Auto</button>
+                        <Input type="color" className="h-8 w-9 p-1" value={isAuto(selection.data.bgColor)? '#ffffff' : selection.data.bgColor} onChange={(e) => onChange({ data: { bgColor: e.target.value } })} />
                       </div>
                     </div>
                   </div>
                   <div className="flex flex-col gap-1">
                     <span className="text-[10px] text-muted-foreground">Opacité {Math.round((selection.data.bgOpacity ?? 1)*100)}%</span>
-                    <input type="range" min={0.1} max={1} step={0.05} value={selection.data.bgOpacity ?? 1} onChange={(e) => onChange({ data: { ...selection.data, bgOpacity: parseFloat(e.target.value) } })} className="w-full" />
+                    <input type="range" min={0.1} max={1} step={0.05} value={selection.data.bgOpacity ?? 1} onChange={(e) => onChange({ data: { bgOpacity: parseFloat(e.target.value) } })} className="w-full" />
                   </div>
                 </div>
               </div>
@@ -402,10 +489,10 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
               <div className="space-y-1">
                 <SectionTitle>Features</SectionTitle>
                 <div className="flex items-center gap-2">
-                  <button type="button" title="Auth simple" onClick={() => onChange({ data:{ ...selection.data, features: exclusiveAuthToggle(selection.data.features, 'auth1', !selection.data.features?.auth1) } })} className={`h-9 w-9 rounded-lg border flex items-center justify-center bg-white hover:bg-slate-50 dark:bg-slate-700 dark:hover:bg-slate-600 ${selection.data.features?.auth1 ? 'ring-2 ring-blue-500 border-blue-400 dark:ring-blue-400 dark:border-blue-400' : 'border-slate-200 dark:border-slate-500'}`}>🔑</button>
-                  <button type="button" title="Auth double" onClick={() => onChange({ data:{ ...selection.data, features: exclusiveAuthToggle(selection.data.features, 'auth2', !selection.data.features?.auth2) } })} className={`h-9 w-9 rounded-lg border flex items-center justify-center bg-white hover:bg-slate-50 dark:bg-slate-700 dark:hover:bg-slate-600 ${selection.data.features?.auth2 ? 'ring-2 ring-blue-500 border-blue-400 dark:ring-blue-400 dark:border-blue-400' : 'border-slate-200 dark:border-slate-500'}`}>🔑🔑</button>
-                  <button type="button" title="Sablier" onClick={() => onChange({ data:{ ...selection.data, features: { ...(selection.data.features||{}), hourglass: !selection.data.features?.hourglass } } })} className={`h-9 w-9 rounded-lg border flex items-center justify-center bg-white hover:bg-slate-50 dark:bg-slate-700 dark:hover:bg-slate-600 ${selection.data.features?.hourglass ? 'ring-2 ring-blue-500 border-blue-400 dark:ring-blue-400 dark:border-blue-400' : 'border-slate-200 dark:border-slate-500'}`}>⏳</button>
-                  <button type="button" title="Firewall" onClick={() => onChange({ data:{ ...selection.data, features: { ...(selection.data.features||{}), firewall: !selection.data.features?.firewall } } })} className={`h-9 w-9 rounded-lg border flex items-center justify-center bg-white hover:bg-slate-50 dark:bg-slate-700 dark:hover:bg-slate-600 ${selection.data.features?.firewall ? 'ring-2 ring-red-500 border-red-400 dark:ring-red-400 dark:border-red-400' : 'border-slate-200 dark:border-slate-500'}`}>🛡️</button>
+                  <button type="button" title="Auth simple" onClick={() => onChange({ data:{ features: exclusiveAuthToggle(selection.data.features, 'auth1', !selection.data.features?.auth1) } })} className={`h-9 w-9 rounded-lg border flex items-center justify-center bg-white hover:bg-slate-50 dark:bg-slate-700 dark:hover:bg-slate-600 ${selection.data.features?.auth1 ? 'ring-2 ring-blue-500 border-blue-400 dark:ring-blue-400 dark:border-blue-400' : 'border-slate-200 dark:border-slate-500'}`}>🔑</button>
+                  <button type="button" title="Auth double" onClick={() => onChange({ data:{ features: exclusiveAuthToggle(selection.data.features, 'auth2', !selection.data.features?.auth2) } })} className={`h-9 w-9 rounded-lg border flex items-center justify-center bg-white hover:bg-slate-50 dark:bg-slate-700 dark:hover:bg-slate-600 ${selection.data.features?.auth2 ? 'ring-2 ring-blue-500 border-blue-400 dark:ring-blue-400 dark:border-blue-400' : 'border-slate-200 dark:border-slate-500'}`}>🔑🔑</button>
+                  <button type="button" title="Sablier" onClick={() => onChange({ data:{ features: { ...(selection.data.features||{}), hourglass: !selection.data.features?.hourglass } } })} className={`h-9 w-9 rounded-lg border flex items-center justify-center bg-white hover:bg-slate-50 dark:bg-slate-700 dark:hover:bg-slate-600 ${selection.data.features?.hourglass ? 'ring-2 ring-blue-500 border-blue-400 dark:ring-blue-400 dark:border-blue-400' : 'border-slate-200 dark:border-slate-500'}`}>⏳</button>
+                  <button type="button" title="Firewall" onClick={() => onChange({ data:{ features: { ...(selection.data.features||{}), firewall: !selection.data.features?.firewall } } })} className={`h-9 w-9 rounded-lg border flex items-center justify-center bg-white hover:bg-slate-50 dark:bg-slate-700 dark:hover:bg-slate-600 ${selection.data.features?.firewall ? 'ring-2 ring-red-500 border-red-400 dark:ring-red-400 dark:border-red-400' : 'border-slate-200 dark:border-slate-500'}`}>🛡️</button>
                 </div>
               </div>
             )}
@@ -413,12 +500,12 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
               <div className="space-y-2">
                 <SectionTitle>Largeur</SectionTitle>
                 <div className="flex gap-2">
-                  {['fixed','auto','custom'].map(mode=>{ const active=(selection.data.widthMode||'fixed')===mode; return <button key={mode} type="button" onClick={()=> onChange({ data:{...selection.data, widthMode:mode } })} className={`px-3 h-8 rounded-md text-[11px] border capitalize ${active?'bg-blue-500 text-white border-blue-500':'bg-slate-100 dark:bg-slate-700 border-slate-300 dark:border-slate-600 hover:bg-slate-200 dark:hover:bg-slate-600'}`}>{mode}</button>; })}
+                  {['fixed','auto','custom'].map(mode=>{ const active=(selection.data.widthMode||'fixed')===mode; return <button key={mode} type="button" onClick={()=> onChange({ data:{ widthMode:mode } })} className={`px-3 h-8 rounded-md text-[11px] border capitalize ${active?'bg-blue-500 text-white border-blue-500':'bg-slate-100 dark:bg-slate-700 border-slate-300 dark:border-slate-600 hover:bg-slate-200 dark:hover:bg-slate-600'}`}>{mode}</button>; })}
                 </div>
                 {(selection.data.widthMode==='custom') && (
                   <div className="flex items-center gap-2">
-                    <input type="range" min={140} max={800} step={10} value={selection.data.customWidth || 240} onChange={(e)=> onChange({ data:{...selection.data, customWidth: parseInt(e.target.value,10) } })} className="flex-1" />
-                    <Input type="number" className="w-24" value={selection.data.customWidth || 240} onChange={(e)=> onChange({ data:{...selection.data, customWidth: parseInt(e.target.value,10)||240 } })} />
+                    <input type="range" min={140} max={800} step={10} value={selection.data.customWidth || 240} onChange={(e)=> onChange({ data:{ customWidth: parseInt(e.target.value,10) } })} className="flex-1" />
+                    <Input type="number" className="w-24" value={selection.data.customWidth || 240} onChange={(e)=> onChange({ data:{ customWidth: parseInt(e.target.value,10)||240 } })} />
                   </div>
                 )}
               </div>
@@ -432,7 +519,7 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
                     type="checkbox"
                     id="useServiceColorForInstances"
                     checked={!!selection.data.useServiceColorForInstances}
-                    onChange={e => onChange({ data: { ...selection.data, useServiceColorForInstances: e.target.checked } })}
+                    onChange={e => onChange({ data: { useServiceColorForInstances: e.target.checked } })}
                   />
                   <label htmlFor="useServiceColorForInstances" className="text-xs select-none cursor-pointer">Utiliser la couleur du service pour les instances</label>
                 </div>
@@ -453,7 +540,7 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
                             const gid = e.target.value || undefined;
                             const list = [...(selection.data.instances||[])];
                             list[idx] = { ...list[idx], groupId: gid as any } as any;
-                            onChange({ data: { ...selection.data, instances: list } });
+                            onChange({ data: { instances: list } });
                           }}>
                             <option value="">— choisir —</option>
                             {instGroups.map(g => (<option key={g.id} value={g.id}>{g.label}</option>))}
@@ -464,16 +551,16 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
                         </div>
                         <div className="flex items-center gap-2">
                           <div className="flex items-center gap-1">
-                            <button type="button" title="No auth" onClick={()=>{ const list=[...(selection.data.instances||[])]; list[idx]={...list[idx], auth: undefined}; onChange({ data:{...selection.data, instances:list} }); }} className={`h-7 w-7 rounded-md border text-xs ${!auth ? 'ring-2 ring-slate-400 border-slate-300' : 'border-slate-200'}`}>—</button>
-                            <button type="button" title="Auth simple" onClick={()=>{ const list=[...(selection.data.instances||[])]; list[idx]={...list[idx], auth:'auth1'}; onChange({ data:{...selection.data, instances:list} }); }} className={`h-7 w-7 rounded-md border text-[10px] leading-[0.8] ${auth==='auth1' ? 'ring-2 ring-blue-500 border-blue-400' : 'border-slate-200'}`}><span>🔑</span></button>
-                            <button type="button" title="Auth double" onClick={()=>{ const list=[...(selection.data.instances||[])]; list[idx]={...list[idx], auth:'auth2'}; onChange({ data:{...selection.data, instances:list} }); }} className={`h-7 w-7 rounded-md border text-[10px] leading-[0.8] ${auth==='auth2' ? 'ring-2 ring-blue-500 border-blue-400' : 'border-slate-200'}`}><span className="inline-flex flex-col" style={{ lineHeight: 0.8 }}><span>🔑</span><span>🔑</span></span></button>
+                            <button type="button" title="No auth" onClick={()=>{ const list=[...(selection.data.instances||[])]; list[idx]={...list[idx], auth: undefined}; onChange({ data:{ instances:list} }); }} className={`h-7 w-7 rounded-md border text-xs ${!auth ? 'ring-2 ring-slate-400 border-slate-300' : 'border-slate-200'}`}>—</button>
+                            <button type="button" title="Auth simple" onClick={()=>{ const list=[...(selection.data.instances||[])]; list[idx]={...list[idx], auth:'auth1'}; onChange({ data:{ instances:list} }); }} className={`h-7 w-7 rounded-md border text-[10px] leading-[0.8] ${auth==='auth1' ? 'ring-2 ring-blue-500 border-blue-400' : 'border-slate-200'}`}><span>🔑</span></button>
+                            <button type="button" title="Auth double" onClick={()=>{ const list=[...(selection.data.instances||[])]; list[idx]={...list[idx], auth:'auth2'}; onChange({ data:{ instances:list} }); }} className={`h-7 w-7 rounded-md border text-[10px] leading-[0.8] ${auth==='auth2' ? 'ring-2 ring-blue-500 border-blue-400' : 'border-slate-200'}`}><span className="inline-flex flex-col" style={{ lineHeight: 0.8 }}><span>🔑</span><span>🔑</span></span></button>
                           </div>
                           <div className="ml-auto flex items-center gap-1">
                             {/* Aperçu (hérite du groupe) */}
                             <div className="h-7 px-2 rounded-md border text-[11px] flex items-center gap-2" style={{ background: grp?.color || '#ffffff', color: autoTextColor(grp?.color || '#ffffff'), borderColor: grp?.color || '#e2e8f0' }}>
                               <span className="truncate max-w-[140px]">{grp?.label || '—'}</span>
                             </div>
-                            <button type="button" onClick={()=>{ const list=[...(selection.data.instances||[])]; list.splice(idx,1); onChange({ data:{...selection.data, instances:list} }); }} className="h-7 px-2 rounded-md bg-slate-100 hover:bg-slate-200 border">✕</button>
+                            <button type="button" onClick={()=>{ const list=[...(selection.data.instances||[])]; list.splice(idx,1); onChange({ data:{ instances:list} }); }} className="h-7 px-2 rounded-md bg-slate-100 hover:bg-slate-200 border">✕</button>
                           </div>
                         </div>
                       </div>
@@ -485,7 +572,7 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
                       const gid = (instGroups[0]?.id) || addInstGroup('Groupe', pickInstSmartColor()).id;
                       const list=[...(selection.data.instances||[])];
                       list.push({ groupId: gid } as any);
-                      onChange({ data:{...selection.data, instances:list} });
+                      onChange({ data:{ instances:list} });
                     }}>Add instance from group</Button>
                   </div>
                   {/* Inline editor for instance groups (compact) */}
@@ -515,7 +602,7 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
                 <div className="flex items-center gap-2 pt-1">
                   <Checkbox
                     checked={!!selection.data?.autoLinkToNetworks}
-                    onCheckedChange={(v) => onChange({ data: { ...selection.data, autoLinkToNetworks: !!v } })}
+                    onCheckedChange={(v) => onChange({ data: { autoLinkToNetworks: !!v } })}
                   />
                   <span className="text-xs">Lier automatiquement aux réseaux</span>
                 </div>
@@ -531,20 +618,20 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
                 <SectionTitle>Door</SectionTitle>
                 <div className="space-y-1">
                   <Label>Allowed</Label>
-                  <Input value={selection.data.allow || ''} placeholder="e.g., HTTPS" onChange={(e) => onChange({ data: { ...selection.data, allow: e.target.value } })} />
+                  <Input value={selection.data.allow || ''} placeholder="e.g., HTTPS" onChange={(e) => onChange({ data: { allow: e.target.value } })} />
                   <div className="text-[11px] text-slate-500">Text shown on the door, representing the allowed flow.</div>
                 </div>
                 <div className="pt-2 grid grid-cols-2 gap-2">
                   <div>
                     <Label>Width</Label>
-                    <input type="range" min={80} max={240} step={4} value={selection.data.width ?? DEFAULT_DOOR_WIDTH} onChange={(e)=> onChange({ data: { ...selection.data, width: parseInt(e.target.value,10) } })} className="w-full" />
+                    <input type="range" min={80} max={240} step={4} value={selection.data.width ?? DEFAULT_DOOR_WIDTH} onChange={(e)=> onChange({ data: { width: parseInt(e.target.value,10) } })} className="w-full" />
                     <div className="text-[11px] text-slate-500">{selection.data.width ?? DEFAULT_DOOR_WIDTH}px</div>
                   </div>
                   <div>
                     <Label>Scale</Label>
-                    <input type="range" min={0.6} max={2} step={0.05} value={selection.data.scale ?? 1} onChange={(e)=> onChange({ data: { ...selection.data, scale: parseFloat(e.target.value) } })} className="w-full" />
+                    <input type="range" min={0.6} max={2} step={0.05} value={selection.data.scale ?? 1} onChange={(e)=> onChange({ data: { scale: parseFloat(e.target.value) } })} className="w-full" />
                     <div className="text-[11px] text-slate-500">{Math.round((selection.data.scale ?? 1)*100)}%</div>
-                    <label className="flex items-center gap-2 text-xs mt-1"><input type="checkbox" checked={!!selection.data.lockedIcon} onChange={(e)=> onChange({ data:{ ...selection.data, lockedIcon: e.target.checked } })} /> Lock icon</label>
+                    <label className="flex items-center gap-2 text-xs mt-1"><input type="checkbox" checked={!!selection.data.lockedIcon} onChange={(e)=> onChange({ data:{ lockedIcon: e.target.checked } })} /> Lock icon</label>
                   </div>
                 </div>
                 <div className="pt-2">
@@ -554,7 +641,7 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
                     const side = selection.data.side as ('top'|'bottom'|'left'|'right'|undefined);
                     const nextOffsets:any = { ...(selection.data.offsets||{}) };
                     if (side) nextOffsets[side] = v; else nextOffsets.top = v;
-                    onChange({ data: { ...selection.data, offset: v, offsets: nextOffsets }, resnapDoor: true });
+                    onChange({ data: { offset: v, offsets: nextOffsets }, resnapDoor: true });
                   }} className="w-full" />
                   <div className="text-[11px] text-slate-500">Anchored side: {selection.data.side || 'auto'}</div>
                 </div>
@@ -565,14 +652,69 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
                 <div className="space-y-1">
                   <SectionTitle>Container</SectionTitle>
                   <div className="grid grid-cols-2 gap-2">
-                    <Input type="number" value={selection.data.width} onChange={(e) => onChange({ data: { ...selection.data, width: Number(e.target.value) || 0 } })} />
-                    <Input type="number" value={selection.data.height} onChange={(e) => onChange({ data: { ...selection.data, height: Number(e.target.value) || 0 } })} />
+          <Input type="number" value={selection.data.width} onChange={(e) => {
+                      const w = Number(e.target.value) || 0;
+                      if (aspect?.locked && currentRatio > 0) {
+                        const h = Math.max(1, Math.round(w / currentRatio));
+            onChange({ data: { width: w, height: h } });
+                      } else {
+            onChange({ data: { width: w } });
+                      }
+                    }} />
+          <Input type="number" value={selection.data.height} onChange={(e) => {
+                      const h = Number(e.target.value) || 0;
+                      if (aspect?.locked && currentRatio > 0) {
+                        const w = Math.max(1, Math.round(h * currentRatio));
+            onChange({ data: { width: w, height: h } });
+                      } else {
+            onChange({ data: { height: h } });
+                      }
+                    }} />
+                  </div>
+                  {/* Aspect ratio controls for containers */}
+                  <div className="space-y-1 pt-1">
+                    <Label>Aspect</Label>
+                    <div className="flex items-center gap-2">
+                      <Checkbox checked={!!aspect.locked} onCheckedChange={(v)=> handleAspectToggle(!!v)} />
+                      <span className="text-xs">Contraindre l’aspect</span>
+                    </div>
+                    {aspect.locked && (
+                      <div className="grid grid-cols-2 gap-2">
+                        <select
+                          className="h-8 px-2 rounded border text-xs dark:bg-slate-700 dark:border-slate-600"
+                          value={aspect.preset && presets.some(p=>p.id===aspect.preset) ? aspect.preset : 'custom'}
+                          onChange={(e)=> applyPreset(e.target.value)}
+                        >
+                          {presets.map(p => (<option key={p.id} value={p.id}>{p.label}</option>))}
+                        </select>
+                        <div className="flex items-center gap-1">
+                          <Input
+                            type="number"
+                            className="h-8 w-16 text-xs"
+                            value={aspect.custom?.w ?? 16}
+                            onChange={(e)=> applyCustomWH('w', parseInt(e.target.value||'0',10) || 1)}
+                            disabled={aspect.preset !== 'custom'}
+                          />
+                          <span className="text-xs">:</span>
+                          <Input
+                            type="number"
+                            className="h-8 w-16 text-xs"
+                            value={aspect.custom?.h ?? 9}
+                            onChange={(e)=> applyCustomWH('h', parseInt(e.target.value||'0',10) || 1)}
+                            disabled={aspect.preset !== 'custom'}
+                          />
+                        </div>
+                      </div>
+                    )}
+                    {aspect.locked && (
+                      <div className="text-[11px] text-slate-500">Ratio: {currentRatio.toFixed(4)}</div>
+                    )}
                   </div>
                   <div className="space-y-1">
                     <Label>Partitions (vertical)</Label>
                     <Input type="number" min={1} max={12} value={selection.data.partitions ?? 1} onChange={(e)=>{
                       let v = parseInt(e.target.value,10); if (isNaN(v)) v = 1; v = Math.max(1, Math.min(12, v));
-                      onChange({ data: { ...selection.data, partitions: v } });
+                      onChange({ data: { partitions: v } });
                     }} />
                   </div>
                   {/* Partition badges */}
@@ -651,7 +793,7 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
                     <span className="text-[11px] text-slate-500 dark:text-slate-400">Header</span>
                     {['top','left'].map(p => {
                       const active = (selection.data.headerPos||'top')===p;
-                      return <button key={p} type="button" onClick={()=>onChange({ data:{...selection.data, headerPos:p } })} className={`px-2 h-7 rounded-md text-[11px] border capitalize ${active?'bg-blue-500 text-white border-blue-500 dark:bg-blue-500 dark:text-white':'bg-slate-100 dark:bg-slate-700 border-slate-300 dark:border-slate-600 hover:bg-slate-200 dark:hover:bg-slate-600'}`}>{p}</button>;
+                      return <button key={p} type="button" onClick={()=>onChange({ data:{ headerPos:p } })} className={`px-2 h-7 rounded-md text-[11px] border capitalize ${active?'bg-blue-500 text-white border-blue-500 dark:bg-blue-500 dark:text-white':'bg-slate-100 dark:bg-slate-700 border-slate-300 dark:border-slate-600 hover:bg-slate-200 dark:hover:bg-slate-600'}`}>{p}</button>;
                     })}
                   </div>
                 </div>
@@ -659,7 +801,7 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
                   <Button variant="outline" size="sm" className="w-full" onClick={() => onChange({ autoFitContainer: true })}>Auto-fit aux enfants</Button>
                 </div>
                 <div className="flex items-center gap-2">
-                  <Checkbox checked={!!selection.data.locked} onCheckedChange={(v) => onChange({ data: { ...selection.data, locked: !!v } })} />
+                  <Checkbox checked={!!selection.data.locked} onCheckedChange={(v) => onChange({ data: { locked: !!v } })} />
                   <span className="text-xs">Verrouiller le container</span>
                 </div>
 
@@ -688,7 +830,7 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
                     const active = selection.data.icon === c.icon;
                     return (
                       <div key={c.id} className="group relative">
-                        <button type="button" onClick={() => onChange({ data: { ...selection.data, icon: c.icon } })} className={`h-10 w-10 rounded-xl border bg-white/80 dark:bg-slate-800/70 hover:bg-white dark:hover:bg-slate-700 hover:shadow-md transition-all duration-200 flex items-center justify-center p-1 ${active ? 'ring-2 ring-blue-500 border-blue-400 dark:ring-blue-400 dark:border-blue-400' : 'border-slate-200 dark:border-slate-600'}`}>
+                        <button type="button" onClick={() => onChange({ data: { icon: c.icon } })} className={`h-10 w-10 rounded-xl border bg-white/80 dark:bg-slate-800/70 hover:bg-white dark:hover:bg-slate-700 hover:shadow-md transition-all duration-200 flex items-center justify-center p-1 ${active ? 'ring-2 ring-blue-500 border-blue-400 dark:ring-blue-400 dark:border-blue-400' : 'border-slate-200 dark:border-slate-600'}`}>
                           <img src={c.icon} alt="" className="h-8 w-8 object-contain" />
                         </button>
                         <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-2 py-1 bg-slate-900/90 text-white text-xs rounded-md opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-10">

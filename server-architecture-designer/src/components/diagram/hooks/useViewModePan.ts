@@ -10,7 +10,9 @@ export function useViewModePan(
   const panLastRef = useRef<{ x: number; y: number } | null>(null);
 
   const onMouseDown = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
-    if (!viewLocked) return;
+    // Allow panning either when in view-locked mode, or when holding a modifier (Ctrl/Cmd)
+    const modifierHeld = e.ctrlKey || e.metaKey;
+    if (!viewLocked && !modifierHeld) return;
     if (e.button !== 0) return; // left button only
     e.preventDefault();
     e.stopPropagation();

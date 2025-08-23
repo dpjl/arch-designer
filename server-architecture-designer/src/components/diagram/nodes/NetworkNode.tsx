@@ -36,6 +36,8 @@ const NetworkNode = memo(({ id, data, selected, isConnectable }: NetworkNodeProp
     e.preventDefault(); e.stopPropagation();
     if ((e.nativeEvent as any)?.stopImmediatePropagation) (e.nativeEvent as any).stopImmediatePropagation();
     const startX = (e as any).clientX, startY = (e as any).clientY; const startW = width, startH = height;
+    const lockedAspect = !!data?.aspect?.locked;
+    const aspectRatio = (typeof data?.aspect?.ratio === 'number' && data.aspect.ratio > 0) ? data.aspect.ratio : (startW > 0 && startH > 0 ? startW / startH : undefined);
     document.body.classList.add('resizing-container');
   const move = (ev: MouseEvent) => {
       let dw = ev.clientX - startX; let dh = ev.clientY - startY;
@@ -44,6 +46,16 @@ const NetworkNode = memo(({ id, data, selected, isConnectable }: NetworkNodeProp
       if (dir.includes('s')) newH = Math.max(140, startH + dh);
       if (dir.includes('w')) newW = Math.max(200, startW - dw);
       if (dir.includes('n')) newH = Math.max(140, startH - dh);
+      if (lockedAspect && aspectRatio && aspectRatio > 0) {
+        if (dir === 'e' || dir === 'w') {
+          newH = Math.max(140, Math.round(newW / aspectRatio));
+        } else if (dir === 's' || dir === 'n') {
+          newW = Math.max(200, Math.round(newH * aspectRatio));
+        } else {
+          if (Math.abs(dw) >= Math.abs(dh)) newH = Math.max(140, Math.round(newW / aspectRatio));
+          else newW = Math.max(200, Math.round(newH * aspectRatio));
+        }
+      }
       try {
         if ((window as any).__snapEnabled) {
           newW = Math.max(200, Math.round(newW / GRID_SIZE) * GRID_SIZE);
