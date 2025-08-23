@@ -880,11 +880,6 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
                 <Button variant="outline" size="sm" className="w-full" onClick={() => onChange({ detachFromParent: true })}>Détacher du container (ou Alt+Drag)</Button>
               </div>
             )}
-            {!isDoor && isContainer && selection.parentNode && (
-              <div>
-                <Button variant="outline" size="sm" className="w-full" onClick={() => onChange({ detachFromParent: true })}>Détacher ce container du parent</Button>
-              </div>
-            )}
           </>
         ) : (
           <>
