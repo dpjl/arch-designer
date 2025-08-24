@@ -773,7 +773,8 @@ function DiagramCanvas({
     }
   const headerOffset = parent ? headerOffsetFor(parent) : 0;
   const parentAbs = parent ? absoluteOf(parent) : null;
-  const position = parent ? { x: absPos.x - parentAbs!.x, y: absPos.y - parentAbs!.y - headerOffset } : absPos;
+  // Important: do NOT subtract header from local Y; children must appear below header visually
+  const position = parent ? { x: absPos.x - parentAbs!.x, y: absPos.y - parentAbs!.y } : absPos;
     const nid = `${id}-${Math.random().toString(36).slice(2, 8)}`;
     const data: any = { idInternal: nid, label, icon, color, features: {}, isContainer: false };
     if (parent && parent.type==='network') {
@@ -815,8 +816,8 @@ function DiagramCanvas({
         if (container.data?.locked) return n; // locked target
         // forbid network nesting into another network
         if (n.type==='network' && container.type==='network') return n;
-        const headerOffset = headerOffsetFor(container);
-        const containerAbs = absoluteOf(container);
+  const headerOffset = headerOffsetFor(container);
+  const containerAbs = absoluteOf(container);
         // Determine partition index for new child based on x within container
         const isNet = container.type==='network';
         const headerLeft = (container.data?.headerPos||'top')==='left' ? (isNet?NETWORK_HEADER_HEIGHT:CONTAINER_HEADER_HEIGHT) : 0;
@@ -829,7 +830,8 @@ function DiagramCanvas({
           ...n,
           parentNode: container.id,
           extent: "parent",
-          position: { x: absPos.x - containerAbs.x, y: absPos.y - containerAbs.y - headerOffset },
+          // Do not subtract header offset here; positions are in parent-local space from top-left
+          position: { x: absPos.x - containerAbs.x, y: absPos.y - containerAbs.y },
           data: { ...(n.data||{}), parentPartition: pIdx }
         };
         if (n.type==='component' && !n.data?.isContainer && container.type==='network') {
@@ -847,14 +849,123 @@ function DiagramCanvas({
 
   // Selection / connect
   const onNodeClick = useCallback((evt: any, node: any) => {
-    if (mode === MODES.EDIT) selectNode(node);
+    if (mode !== MODES.EDIT) return;
+    // Let React Flow handle additive selection when Shift is held
+    if (evt?.shiftKey) return;
+    selectNode(node);
   }, [mode, selectNode]);
 
   const onEdgeClick = useCallback((_: any, edge: any) => { if (mode === MODES.EDIT) setSelection({ ...edge, type: "edge" }); }, [mode, setSelection]);
 
   const updateSelection = useCallback((patch: any) => {
-    if (!selection) return;
+    // Allow certain actions even without a focused single node
+    if (!selection) {
+      if (patch?.wrapSelectionInContainer) {
+        setNodes((nds) => {
+          const targetIds = nds.filter(n=>n.selected).map(n=>n.id);
+          if (!targetIds.length) return nds;
+          const subset = nds.filter(n=>targetIds.includes(n.id) && n.type!=='door');
+          const parentId = subset.every(n=>n.parentNode===subset[0].parentNode) ? (subset[0].parentNode||undefined) : undefined;
+          let minX=Infinity,minY=Infinity,maxX=-Infinity,maxY=-Infinity;
+          subset.forEach(n=>{ const abs=absolutePosition(n, nds); const w=(n.style?.width||n.data?.width||n.width||150) as number; const h=(n.style?.height||n.data?.height||n.height||100) as number; minX=Math.min(minX,abs.x); minY=Math.min(minY,abs.y); maxX=Math.max(maxX,abs.x+w); maxY=Math.max(maxY,abs.y+h); });
+          if (!isFinite(minX) || !isFinite(minY)) return nds;
+          const PAD_SIDE=16, PAD_TOP=12, PAD_BOTTOM=16; const HEADER=CONTAINER_HEADER_HEIGHT;
+          const contentW = Math.round(maxX - minX);
+          const contentH = Math.round(maxY - minY);
+          const width = Math.max(200, contentW + PAD_SIDE*2);
+          const height = Math.max(140, HEADER + contentH + PAD_TOP + PAD_BOTTOM);
+          const containerId = `group-${Math.random().toString(36).slice(2,8)}`;
+          const absPos = { x: Math.round(minX - PAD_SIDE), y: Math.round(minY - HEADER - PAD_TOP) };
+          let position = absPos; let extent:any = undefined; let newParentId:any = undefined;
+          if (parentId) {
+            const parent = nds.find(p=>p.id===parentId);
+            if (parent) { const pAbs = absolutePosition(parent, nds); const offY = (parent.type==='network'?NETWORK_HEADER_HEIGHT:(parent.data?.isContainer?CONTAINER_HEADER_HEIGHT:0)); position = { x: absPos.x - pAbs.x, y: absPos.y - pAbs.y - offY }; newParentId = parentId; extent = 'parent'; }
+          }
+          const newContainer:any = { id: containerId, type:'component', position, data:{ idInternal:containerId, label:'Container', color:'#475569', width, height, locked:false, isContainer:true, bgColor:'#ffffff', bgOpacity:0.85 }, style:{ width, height }, parentNode:newParentId, extent };
+          const next = nds.map(n=>{ if (!targetIds.includes(n.id)) return n; const abs=absolutePosition(n, nds); const local={ x: abs.x - absPos.x, y: abs.y - absPos.y }; return { ...n, parentNode: containerId, extent:'parent', position: local } as any; });
+          return next.concat(newContainer);
+        });
+        return;
+      }
+      return;
+    }
     if (selection.type === 'node') {
+      // Remove container but keep its children at same hierarchy level
+      if (patch.removeContainerKeepChildren && (selection.data?.isContainer || selection.nodeType==='network')) {
+        setNodes((nds) => {
+          const container = nds.find(n=>n.id===selection.id);
+          if (!container) return nds;
+          const parentId = container.parentNode;
+          const containerAbs = absolutePosition(container, nds);
+          const headerOffset = container.type==='network' ? NETWORK_HEADER_HEIGHT : (container.data?.isContainer ? CONTAINER_HEADER_HEIGHT : 0);
+          // Reparent children: convert to absolute, then to new parent local coords
+          const children = nds.filter(n=>n.parentNode===selection.id);
+          let next = nds.filter(n=>n.id!==selection.id).map(n=>{
+            if (!children.find(c=>c.id===n.id)) return n;
+            // compute abs pos
+            const abs = absolutePosition(n, nds);
+            if (!parentId) {
+              return { ...n, parentNode: undefined, extent: undefined, position: abs } as any;
+            }
+            const parent = nds.find(p=>p.id===parentId);
+            if (!parent) return { ...n, parentNode: undefined, extent: undefined, position: abs } as any;
+            const parentAbs = absolutePosition(parent, nds);
+            const offY = (parent.type==='network' ? NETWORK_HEADER_HEIGHT : (parent.data?.isContainer ? CONTAINER_HEADER_HEIGHT : 0));
+            const local = { x: abs.x - parentAbs.x, y: abs.y - parentAbs.y - offY };
+            return { ...n, parentNode: parentId, extent: 'parent' as const, position: local } as any;
+          });
+          return next;
+        });
+        setSelection(null);
+        return;
+      }
+      // Wrap single node or current multi-selection in a new container sized to fit
+      if (patch.wrapSelectionInContainer) {
+        setNodes((nds) => {
+          const selectedIds = nds.filter(n=>n.selected).map(n=>n.id);
+          const targetIds = selectedIds.length ? selectedIds : [selection.id];
+          // Exclure les portes du wrapping pour éviter les incohérences
+          const subset = nds.filter(n=>targetIds.includes(n.id) && n.type!== 'door');
+          if (!subset.length) return nds;
+          // Compute common parent to keep hierarchy consistent
+          const parentId = subset.every(n=>n.parentNode===subset[0].parentNode) ? (subset[0].parentNode||undefined) : undefined;
+          // Compute tight bounds in scene
+          let minX=Infinity,minY=Infinity,maxX=-Infinity,maxY=-Infinity;
+          subset.forEach(n=>{ const abs=absolutePosition(n, nds); const w=(n.style?.width||n.data?.width||n.width||150) as number; const h=(n.style?.height||n.data?.height||n.height||100) as number; minX=Math.min(minX,abs.x); minY=Math.min(minY,abs.y); maxX=Math.max(maxX,abs.x+w); maxY=Math.max(maxY,abs.y+h); });
+          if (!isFinite(minX) || !isFinite(minY)) return nds;
+          // Minimal size with padding + header reserved on top
+          const PAD_SIDE=16, PAD_TOP=12, PAD_BOTTOM=16; const HEADER=CONTAINER_HEADER_HEIGHT;
+          const contentW = Math.round(maxX - minX);
+          const contentH = Math.round(maxY - minY);
+          const width = Math.max(200, contentW + PAD_SIDE*2);
+          const height = Math.max(140, HEADER + contentH + PAD_TOP + PAD_BOTTOM);
+          const containerId = `group-${Math.random().toString(36).slice(2,8)}`;
+          // Container absolute position: reserve header above content
+          const absPos = { x: Math.round(minX - PAD_SIDE), y: Math.round(minY - HEADER - PAD_TOP) };
+          // If parent exists, convert to local
+          let position = absPos; let extent:any = undefined; let newParentId:any = undefined;
+          if (parentId) {
+            const parent = nds.find(p=>p.id===parentId);
+            if (parent) {
+              const pAbs = absolutePosition(parent, nds);
+              const offY = (parent.type==='network'?NETWORK_HEADER_HEIGHT:(parent.data?.isContainer?CONTAINER_HEADER_HEIGHT:0));
+              position = { x: absPos.x - pAbs.x, y: absPos.y - pAbs.y - offY };
+              newParentId = parentId; extent = 'parent';
+            }
+          }
+          const newContainer:any = { id: containerId, type:'component', position, data:{ idInternal:containerId, label:'Container', color:'#475569', width, height, locked:false, isContainer:true, bgColor:'#ffffff', bgOpacity:0.85 }, style:{ width, height }, parentNode:newParentId, extent };
+          // Reparent subset under new container, keep relative positions
+          const next = nds.map(n=>{
+            if (!targetIds.includes(n.id)) return n;
+            const abs = absolutePosition(n, nds);
+            // Convert to local coords: do NOT subtract header; container top already accounts for HEADER
+            const local = { x: abs.x - absPos.x, y: abs.y - absPos.y };
+            return { ...n, parentNode: containerId, extent: 'parent', position: local } as any;
+          });
+          return next.concat(newContainer);
+        });
+        return;
+      }
         // Resize network container to fit children
         if (patch.autoFitNetwork && selection.type==='node' && selection.nodeType==='network') {
           setNodes((nds) => {
@@ -1672,7 +1783,10 @@ function DiagramCanvas({
                   <ReactFlow
                     nodes={nodes}
                     edges={edges}
-                    onNodesChange={(changes)=>{ if (mode === MODES.EDIT) onNodesChange(changes); }}
+                    onNodesChange={(changes)=>{
+                      if (mode !== MODES.EDIT) return;
+                      onNodesChange(changes);
+                    }}
                     onEdgesChange={(changes)=>{ if (mode === MODES.EDIT) onEdgesChange(changes); }}
                     onConnect={(params)=>{ if (mode === MODES.EDIT) onConnect(params); }}
                     onDrop={onDrop as any}
@@ -1694,6 +1808,8 @@ function DiagramCanvas({
                     nodesConnectable={mode === MODES.EDIT}
                     elementsSelectable={mode === MODES.EDIT}
                     selectNodesOnDrag={mode === MODES.EDIT}
+                    panOnDrag={false}
+                    selectionOnDrag
                     defaultEdgeOptions={{
                       type: 'default',
                       style: { strokeWidth: 2, stroke: '#64748b' },
@@ -1702,6 +1818,7 @@ function DiagramCanvas({
                     snapToGrid={snapEnabled}
                     snapGrid={[GRID, GRID]}
                     fitView
+                    deleteKeyCode={[]}
                   >
                     <MiniMap pannable zoomable className="!rounded-xl !bg-white/80 dark:!bg-slate-800/65 !backdrop-blur !border border-slate-200/60 dark:!border-slate-600/60" nodeStrokeWidth={1} nodeColor={miniMapNodeColorFn} />
                     <Controls showInteractive={false} className="!rounded-xl" />

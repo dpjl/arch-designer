@@ -182,6 +182,7 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
           <div className="text-sm text-slate-600 dark:text-slate-300">{multiCount} éléments sélectionnés.</div>
           <div className="flex gap-2">
             <Button variant="destructive" onClick={onDeleteSelected} className="rounded-md"><Trash2 className="h-4 w-4 mr-2"/>Supprimer</Button>
+            <Button variant="secondary" onClick={()=> onChange({ wrapSelectionInContainer: true })} className="rounded-md">Créer un conteneur autour des éléments</Button>
           </div>
           <div className="text-[11px] text-slate-500 dark:text-slate-400">Maj+clic pour ajouter/retirer. Glisser un cadre pour sélectionner une zone.</div>
         </CardContent>
@@ -1162,6 +1163,16 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
         {isNode && (
           <div className="pt-2">
             <Button variant="destructive" size="sm" className="w-full" onClick={onDelete}><Trash2 className="h-4 w-4 mr-2"/>Delete node</Button>
+            {isContainer && (
+              <div className="mt-2">
+                <Button variant="outline" size="sm" className="w-full" onClick={()=> onChange({ removeContainerKeepChildren: true })}>Supprimer le container (garder les enfants)</Button>
+              </div>
+            )}
+            {!isDoor && (
+              <div className="mt-2">
+                <Button variant="outline" size="sm" className="w-full" onClick={()=> onChange({ wrapSelectionInContainer: true })}>Créer un conteneur autour de ce nœud</Button>
+              </div>
+            )}
           </div>
         )}
       </CardContent>
