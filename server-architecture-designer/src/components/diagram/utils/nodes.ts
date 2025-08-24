@@ -1,4 +1,4 @@
-// Node related helpers
+// Node related helpers (moved into diagram scope)
 export const CONTAINER_HEADER_HEIGHT = 44;
 
 export const ensureChildAboveContainerZ = (nodes: any[]) => {

@@ -12,7 +12,7 @@ import { useGroups } from '@/contexts/GroupsContext';
 import { isAuto } from './color-utils';
 import { AutoLayoutControls } from './AutoLayoutControls';
 import { AutoLayoutConfig } from '@/types/diagram';
-import { useStableInput } from '@/hooks/useStableInput';
+import { useStableInput } from './hooks/useStableInput';
 import { useInstanceGroups } from '@/contexts/InstanceGroupsContext';
 
 const DEFAULT_AUTO_LAYOUT: AutoLayoutConfig = {

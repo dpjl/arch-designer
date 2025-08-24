@@ -1,4 +1,4 @@
-// Edge styling & color utilities
+// Edge styling & color utilities (moved into diagram scope)
 export const EDGE_COLOR_MODE = {
   BY_TYPE: 'BY_TYPE',
   BY_SOURCE: 'BY_SOURCE'

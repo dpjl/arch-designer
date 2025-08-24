@@ -439,65 +439,7 @@ function DiagramCanvas({
     };
   }, [nodes, applyAutoLayout]);
 
-  // Edge patterns CSS injection
-  const EdgePatternStyles = () => (
-    <style>{`
-    .react-flow__edge.edge-dashed path { stroke-dasharray:6 6; }
-    .react-flow__edge.edge-anim-dash path { stroke-dasharray:6 6; animation: edge-dash 1.2s linear infinite; }
-    @keyframes edge-dash { to { stroke-dashoffset:-12; } }
-      .container-sel:after { content:""; position:absolute; inset:0; border:2px dashed #3b82f6; border-radius:1rem; pointer-events:none; }
-
-  /* Elevate edges above nodes (user request) */
-  .react-flow__edges { z-index: 50 !important; }
-  .react-flow__nodes { z-index: 10 !important; }
-  /* Grid color now controlled via ReactFlow <Background color=> prop; CSS fallback kept minimal */
-  .dark .react-flow__background { background: linear-gradient(to bottom, #0f172a, #020617); }
-  /* Preserve node interactivity: edge paths keep pointer-events default (stroke) */
-
-  /* Improved edge label styling */
-  .react-flow__edge .react-flow__edge-textwrapper { filter: drop-shadow(0 2px 4px rgba(0,0,0,0.25)); }
-  .react-flow__edge .react-flow__edge-textbg { fill: rgba(255,255,255,0.9); stroke: rgba(148,163,184,0.6); stroke-width:1; rx:6; ry:6; }
-  .react-flow__edge text.react-flow__edge-text { font-family: system-ui, Inter, sans-serif; font-size:11px; font-weight:600; letter-spacing:0.25px; fill:#334155; }
-  .react-flow__edge:hover text.react-flow__edge-text { fill:#0f172a; }
-  .react-flow__edge.selected text.react-flow__edge-text { fill:#1e3a8a; }
-  .dark .react-flow__edge .react-flow__edge-textbg { fill: rgba(15,23,42,0.72); stroke: rgba(100,116,139,0.35); }
-  .dark .react-flow__edge text.react-flow__edge-text { fill:#cbd5e1; }
-  .dark .react-flow__edge:hover text.react-flow__edge-text { fill:#e2e8f0; }
-  .dark .react-flow__edge.selected text.react-flow__edge-text { fill:#3b82f6; }
-
-  /* Larger handles for easier connecting */
-  .react-flow__handle.handle-lg { width: 16px; height: 16px; border: 2px solid #ffffff; box-shadow: 0 0 0 3px rgba(59,130,246,0.35); }
-  .react-flow__handle.handle-lg:hover { box-shadow: 0 0 0 4px rgba(59,130,246,0.55); }
-  
-  /* Network link edge styling */
-  .react-flow__edge.network-link-edge path { 
-    stroke-width: 3px;
-    filter: drop-shadow(0 2px 4px rgba(0,0,0,0.1));
-  }
-  .react-flow__edge.network-link-edge.selected path { 
-    stroke-width: 4px;
-    filter: drop-shadow(0 4px 8px rgba(0,0,0,0.15));
-  }
-  .react-flow__edge.network-link-edge .react-flow__edge-text { 
-    font-size: 11px; 
-    font-weight: 600; 
-    filter: drop-shadow(0 1px 2px rgba(255,255,255,0.8)); 
-  }
-  
-  /* Custom edge anchor handles */
-  .custom-edge .anchor-handle {
-    cursor: grab;
-    transition: all 0.2s ease;
-  }
-  .custom-edge .anchor-handle:hover {
-    transform: scale(1.1);
-  }
-  .custom-edge .anchor-handle.dragging {
-    cursor: grabbing;
-    transform: scale(1.2);
-  }
-    `}</style>
-  );
+  // Edge patterns CSS moved to globals.css
 
   // Stable edge addition + auto color + pattern baseline
   const addDefaultEdge = useCallback((params: any) => {
@@ -1255,7 +1197,7 @@ function DiagramCanvas({
   return (
     <ThemeProvider>
   <div className="h-screen w-full bg-gradient-to-b from-slate-50 to-slate-100 dark:from-slate-950 dark:to-slate-900 text-slate-800 dark:text-slate-100 selection:bg-slate-900/80 selection:text-white dark:selection:bg-slate-100/20 dark:selection:text-slate-100">
-      <EdgePatternStyles />
+  {/* edge label/pattern styles are now in globals.css */}
       <TooltipProvider>
         {historyFlash && (
           <div className="pointer-events-none fixed top-20 left-1/2 -translate-x-1/2 z-[200]">
