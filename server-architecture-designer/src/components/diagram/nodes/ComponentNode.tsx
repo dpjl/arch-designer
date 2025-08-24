@@ -6,39 +6,10 @@ import { Boxes, Lock, Unlock, Key } from 'lucide-react';
 import { useTheme } from '../../theme/ThemeProvider';
 import { useGroups } from '@/contexts/GroupsContext';
 import { hexToRgba, autoTextColor } from '../diagram-helpers';
+import { getBrickTexture } from '../firewall-texture';
 import { effectiveBorderColor, effectiveBgColor, isAuto } from '../color-utils';
 
-// Ensure brick texture generator (used for firewall ring) is available after refactor.
-function generateBrickTexture() {
-  if (typeof document === 'undefined') return { urlH:'', urlV:'', size:24, offX:0, offY:0, shiftTopY:0, shiftSideX:0 };
-  // Return cached if exists
-  const w = window as any;
-  if (w.__brickTexCache) return w.__brickTexCache;
-  const size = 24; // tile size
-  const canvas = document.createElement('canvas'); canvas.width = size; canvas.height = size;
-  const ctx = canvas.getContext('2d')!; ctx.imageSmoothingEnabled = false;
-  const gap = 4; const margin = gap/2; const brickW = size - margin*2; const brickH = Math.round(size*0.5) - gap; const stroke = '#0f172a'; const fill = '#ea580c'; const mortar = '#000000';
-  ctx.fillStyle = mortar; ctx.fillRect(0,0,size,size);
-  ctx.beginPath(); ctx.rect(margin, Math.floor((size-brickH)/2), brickW, brickH); ctx.fillStyle = fill; ctx.fill(); ctx.lineWidth=1; ctx.strokeStyle=stroke; ctx.stroke();
-  const urlH = canvas.toDataURL('image/png');
-  const canvasV = document.createElement('canvas'); canvasV.width = size; canvasV.height = size; const ctxV = canvasV.getContext('2d')!; ctxV.imageSmoothingEnabled=false; ctxV.translate(size,0); ctxV.rotate(Math.PI/2); ctxV.drawImage(canvas,0,0); const urlV = canvasV.toDataURL('image/png');
-  // Precompute offsets relative to ring thickness T
-  const T = 12; const yOffset = Math.floor((size-brickH)/2); const shiftTopY = Math.round(-((yOffset + brickH/2) - T/2)); const shiftSideX = shiftTopY; // symmetrical
-  const cache = { urlH, urlV, size, offX: margin, offY: yOffset, shiftTopY, shiftSideX };
-  w.__brickTexCache = cache; w.__getBrickTexture = () => cache;
-  return cache;
-}
-
-if (typeof window !== 'undefined' && !(window as any).__getBrickTexture) {
-  try { generateBrickTexture(); } catch { /* ignore */ }
-}
-
-const getBrickTexture = () => {
-  if (typeof window === 'undefined') return { urlH:'', urlV:'', size:24, offX:0, offY:0, shiftTopY:0, shiftSideX:0 };
-  const w = window as any;
-  if (w.__getBrickTexture) return w.__getBrickTexture();
-  return generateBrickTexture();
-};
+// getBrickTexture now provided by shared utility
 
 const FeaturesIcons = ({ features, compact }: any) => {
   const { auth1, auth2, hourglass } = features || {};

@@ -42,13 +42,15 @@ import { useDiagramHistory } from './diagram/hooks/useDiagramHistory';
 import { useDiagramSelection } from './diagram/hooks/useDiagramSelection';
 import { useViewModePan } from './diagram/hooks/useViewModePan';
 import { useDiagramShortcuts } from './diagram/hooks/useDiagramShortcuts';
+import { useMultiDrag } from './diagram/hooks/useMultiDrag';
 import { applyZIndexHierarchy, enforceContainerSelectedZ, absolutePosition, headerOffsetFor as headerOffsetForUtil } from './diagram/layout-utils';
 import { applyPatternToEdge } from './diagram/edge-utils';
+import { wrapInContainer as wrapInContainerUtil, removeContainerKeepChildren as removeContainerKeepChildrenUtil } from './diagram/selection-actions/containers';
+import { createDnDHandlers } from './diagram/dnd/createDnDHandlers';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Trash2, Link2, Palette, Lock, Unlock, LayoutGrid, Boxes } from "lucide-react";
-import * as htmlToImage from 'html-to-image';
-import { getExportPixelRatio, parseViewportTransform, computeTightBounds } from '@/lib/export/viewport';
-import { exportViewportCropToPng, exportFullDiagram } from '@/lib/export/exporters';
+import { computeTightBounds } from '@/lib/export/viewport';
+import { exportViewportCropToPng, exportFullDiagram, fitAndExportSelection } from '@/lib/export/exporters';
 import { printDataUrl } from '@/lib/export/print';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { Input } from "@/components/ui/input";
@@ -117,67 +119,7 @@ const FeaturesIcons = memo(({ features, compact }: any) => {
 
 
 
-// Runtime-generated PNG brick texture (small, tiled)
-let __brickTexCache: { urlH: string; urlV: string; size: number; offX: number; offY: number; shiftTopY: number; shiftSideX: number } | null = null;
-function getBrickTexture(): { urlH: string; urlV: string; size: number; offX: number; offY: number; shiftTopY: number; shiftSideX: number } {
-  if (typeof document === 'undefined') return { urlH: '', urlV: '', size: 16, offX: 0, offY: 0, shiftTopY: 0, shiftSideX: 0 };
-  if (__brickTexCache) return __brickTexCache;
-  // Single-brick tile (repeats cleanly) with brown mortar background
-  const size = 24; // tile size controls perceived brick size
-  const canvas = document.createElement('canvas'); canvas.width = size; canvas.height = size;
-  const ctx = canvas.getContext('2d')!;
-  ctx.imageSmoothingEnabled = false;
-  const gap = 4; // desired mortar gap between bricks
-  const margin = gap / 2; // margin within tile so adjacent tiles form correct gap
-  const brickW = size - margin * 2; // brick spans across with margins
-  const brickH = Math.round(size * 0.5) - gap; // rectangular brick height
-  const r = 0; // sharp corners
-  const stroke = '#0f172a'; // dark outline
-  const fill = '#ea580c'; // orange fill
-  const mortarColor = '#000000'; // black mortar
-
-  // mortar background
-  ctx.fillStyle = mortarColor;
-  ctx.fillRect(0, 0, size, size);
-
-  // helper to draw rounded rect brick
-  const brick = (x: number, y: number) => {
-    ctx.beginPath();
-    const x2 = x + brickW, y2 = y + brickH;
-    if (r <= 0) {
-      ctx.rect(x, y, brickW, brickH);
-    } else {
-      ctx.moveTo(x + r, y);
-      ctx.lineTo(x2 - r, y); ctx.quadraticCurveTo(x2, y, x2, y + r);
-      ctx.lineTo(x2, y2 - r); ctx.quadraticCurveTo(x2, y2, x2 - r, y2);
-      ctx.lineTo(x + r, y2); ctx.quadraticCurveTo(x, y2, x, y2 - r);
-      ctx.lineTo(x, y + r); ctx.quadraticCurveTo(x, y, x + r, y);
-    }
-    ctx.closePath();
-    ctx.fillStyle = fill; ctx.fill();
-    ctx.lineWidth = 1; ctx.strokeStyle = stroke; ctx.stroke();
-  };
-
-  // Single centered brick; margins ensure correct gap when repeating
-  const yOffset = Math.floor((size - brickH) / 2);
-  brick(margin, yOffset);
-
-  const urlH = canvas.toDataURL('image/png');
-  // build vertical rotated tile
-  const canvasV = document.createElement('canvas'); canvasV.width = size; canvasV.height = size;
-  const ctxV = canvasV.getContext('2d')!; ctxV.imageSmoothingEnabled = false;
-  ctxV.translate(size, 0); ctxV.rotate(Math.PI/2);
-  ctxV.drawImage(canvas, 0, 0);
-  const urlV = canvasV.toDataURL('image/png');
-  // Precompute shifts to center bricks within ring thickness T=12px
-  const T = 12;
-  const brickCenterY = yOffset + brickH / 2;
-  const brickCenterX = margin + brickW / 2;
-  const shiftTopY = Math.round(-(brickCenterY - T / 2));
-  const shiftSideX = Math.round(-(brickCenterX - T / 2));
-  __brickTexCache = { urlH, urlV, size, offX: margin, offY: yOffset, shiftTopY, shiftSideX };
-  return __brickTexCache;
-}
+// Brick texture now provided by shared utility
 
 
 // Door helpers (precise firewall ring anchoring)
@@ -523,59 +465,6 @@ function DiagramCanvas({
   .dark .react-flow__edge:hover text.react-flow__edge-text { fill:#e2e8f0; }
   .dark .react-flow__edge.selected text.react-flow__edge-text { fill:#3b82f6; }
 
-      /* Firewall ring uses a tiled PNG brick texture set via CSS var --fwtex */
-  .firewall-ring { position:absolute; inset:-8px; border-radius:1.35rem; pointer-events:none; z-index:1; }
-      .firewall-ring .fw-top, .firewall-ring .fw-bottom, .firewall-ring .fw-left, .firewall-ring .fw-right {
-        position:absolute; background-repeat:repeat; background-size: var(--fwtexSize, 16px 16px);
-      }
-      .firewall-ring .fw-badge {
-        position:absolute; top:-42px; left:-34px; pointer-events:none; isolation:isolate;
-        transition:filter .25s ease, transform .25s ease;
-      }
-      .firewall-ring .fw-badge--rect .fw-rect {
-        height:58px; width:58px; border-radius:12px;
-        display:flex; align-items:center; justify-content:center;
-        overflow:hidden;
-        background:linear-gradient(160deg,#ffe4e6 0%,#fecdd3 38%,#fda4af 70%,#fb7185 100%);
-        color:#7a1111; border:2px solid #474747ff;
-        box-shadow:
-          0 8px 16px -6px rgba(0,0,0,0.28),
-          0 0 0 1px rgba(255,255,255,0.65) inset,
-          0 1px 0 0 rgba(255,255,255,0.85) inset,
-          0 -10px 16px -10px rgba(239,68,68,0.20) inset,
-          0 0 0 2px rgba(239,68,68,0.10);
-        backdrop-filter: blur(5px) saturate(1.35);
-      }
-  .firewall-ring .fw-badge--rect .fw-rect svg { width:40px; height:40px; display:block; filter:drop-shadow(0 2px 3px rgba(0,0,0,0.4)); transform: translateY(1px); }
-  /* Assombrir légèrement l’intérieur du bouclier en mode sombre (moins éblouissant) */
-  .dark .firewall-ring .fw-badge--rect .fw-rect svg path { fill:#f4e8d1; }
-      .dark .firewall-ring .fw-badge--rect .fw-rect {
-        background:linear-gradient(150deg,#78350f 0%,#9a3412 48%,#b45309 100%);
-        color:#fde68a; border:2px solid #f59e0b;
-        box-shadow:
-          0 8px 16px -6px rgba(0,0,0,0.6),
-          0 0 0 1px rgba(255,255,255,0.05),
-          0 1px 0 0 rgba(255,255,255,0.1) inset,
-          0 -10px 16px -10px rgba(146,64,14,0.35) inset;
-      }
-      .firewall-ring .fw-label {
-        position:absolute; top:-31px; left:26px; height:20px; line-height:20px; pointer-events:none;
-        color:#7a1111; font-variant-caps: all-small-caps; font-weight:700; font-size:10px; letter-spacing:0.08em;
-        text-shadow:0 1px 0 rgba(255,255,255,0.65);
-        padding:0 8px; border-radius:999px; border:1px solid rgba(239,68,68,0.22);
-        background:linear-gradient(180deg, rgba(239,68,68,0.10), rgba(239,68,68,0.04));
-        box-shadow: 0 1px 2px rgba(0,0,0,0.07);
-      }
-      .dark .firewall-ring .fw-label {
-        color:#fde68a; text-shadow:0 1px 0 rgba(0,0,0,0.6);
-        border-color: rgba(245,158,11,0.38);
-        background:linear-gradient(180deg, rgba(245,158,11,0.22), rgba(245,158,11,0.10));
-      }
-  /* Inner gap from element border + centered bricks within ring */
-  .firewall-ring .fw-top { top: calc(var(--ringGapInner, 2px) * -1); left:0; right:0; height: var(--ringThickness, 8px); border-top-left-radius:1.35rem; border-top-right-radius:1.35rem; background-image: var(--fwtexH); background-position: var(--fwtexOffX, 0) calc(var(--fwShiftTopY, 0)); }
-  .firewall-ring .fw-bottom { bottom: calc(var(--ringGapInner, 2px) * -1); left:0; right:0; height: var(--ringThickness, 8px); border-bottom-left-radius:1.35rem; border-bottom-right-radius:1.35rem; background-image: var(--fwtexH); background-position: var(--fwtexOffX, 0) calc(var(--fwShiftTopY, 0)); }
-  .firewall-ring .fw-left { top:0; bottom:0; left: calc(var(--ringGapInner, 2px) * -1); width: var(--ringThickness, 8px); border-top-left-radius:1.35rem; border-bottom-left-radius:1.35rem; background-image: var(--fwtexV); background-position: calc(var(--fwShiftSideX, 0)) var(--fwtexOffX, 0); }
-  .firewall-ring .fw-right { top:0; bottom:0; right: calc(var(--ringGapInner, 2px) * -1); width: var(--ringThickness, 8px); border-top-right-radius:1.35rem; border-bottom-right-radius:1.35rem; background-image: var(--fwtexV); background-position: calc(var(--fwShiftSideX, 0)) var(--fwtexOffX, 0); }
   /* Larger handles for easier connecting */
   .react-flow__handle.handle-lg { width: 16px; height: 16px; border: 2px solid #ffffff; box-shadow: 0 0 0 3px rgba(59,130,246,0.35); }
   .react-flow__handle.handle-lg:hover { box-shadow: 0 0 0 4px rgba(59,130,246,0.55); }
@@ -720,132 +609,21 @@ function DiagramCanvas({
     return candidates[0].c;
   }, [nodes, absoluteOf]);
 
-  // DnD handlers
-  const onDrop = useCallback((event: DragEvent) => {
-    if (mode !== MODES.EDIT) { event.preventDefault(); return; }
-    event.preventDefault();
-    const bounds = reactFlowWrapper.current!.getBoundingClientRect();
-    const id = (event.dataTransfer as DataTransfer).getData("application/x-id");
-    const label = (event.dataTransfer as DataTransfer).getData("application/x-label");
-    const icon = (event.dataTransfer as DataTransfer).getData("application/x-icon");
-    const color = (event.dataTransfer as DataTransfer).getData("application/x-color");
-  const local = { x: (event as any).clientX - bounds.left, y: (event as any).clientY - bounds.top };
-  const absPos = project(local);
-
-    if (id === "group") {
-      const containerId = `group-${Math.random().toString(36).slice(2, 8)}`;
-      const width = 520, height = 320;
-  const newNode = { id: containerId, type: "component", position: absPos, data: { idInternal: containerId, label: "Container", color: "#475569", width, height, locked: false, isContainer: true, bgColor:'#ffffff', bgOpacity:0.85 }, style: { width, height } };
-      setNodes((nds) => nds.concat(newNode));
-      return;
-    }
-
-  if (id === 'door') {
-      const parent = findContainerAt(absPos);
-      // Doors can only be created on a container with firewall enabled
-      if (!parent || !(parent.data?.features?.firewall)) {
-        return; // ignore drop outside or without firewall
-      }
-      const parentAbs = absoluteOf(parent);
-      const header = headerOffsetFor(parent);
-      let position = { x: absPos.x - parentAbs.x, y: absPos.y - parentAbs.y - header };
-      const nid = `door-${Math.random().toString(36).slice(2, 8)}`;
-      let data:any = { idInternal: nid, isDoor: true, label: 'Door', allow: 'HTTPS', width: DEFAULT_DOOR_WIDTH };
-      const snapped = snapDoorToNearestSide(parent, position, DEFAULT_DOOR_WIDTH, DEFAULT_DOOR_HEIGHT);
-      position = snapped.position; data.side = snapped.side;
-      const newDoor = { id: nid, type: 'door', position, data, parentNode: parent.id, extent: 'parent' as const } as any;
-      setNodes((nds) => nds.concat(newDoor));
-      return;
-    }
-    const parent = findContainerAt(absPos);
-    if (id === 'network') {
-      const nid = `net-${Math.random().toString(36).slice(2, 8)}`;
-      // Forbid nesting a network inside another network
-      if (parent && parent.type === 'network') {
-        // drop at root absolute position
-        const newNode = { id: nid, type: 'network', position: absPos, data: { netId: nid, label: label || 'Network', color: color || '#10b981', width: 420, height: 240 } } as any;
-        setNodes((nds) => nds.concat(newNode));
-        return;
-      }
-      const newNode = { id: nid, type: 'network', position: absPos, data: { netId: nid, label: label || 'Network', color: color || '#10b981', width: 420, height: 240 } } as any;
-      setNodes((nds) => nds.concat(newNode));
-      return;
-    }
-  const headerOffset = parent ? headerOffsetFor(parent) : 0;
-  const parentAbs = parent ? absoluteOf(parent) : null;
-  // Important: do NOT subtract header from local Y; children must appear below header visually
-  const position = parent ? { x: absPos.x - parentAbs!.x, y: absPos.y - parentAbs!.y } : absPos;
-    const nid = `${id}-${Math.random().toString(36).slice(2, 8)}`;
-    const data: any = { idInternal: nid, label, icon, color, features: {}, isContainer: false };
-    if (parent && parent.type==='network') {
-      data.primaryNetwork = parent.data?.netId || parent.id;
-      data.networks = Array.isArray(data.networks) ? Array.from(new Set([...(data.networks||[]), data.primaryNetwork])) : [data.primaryNetwork];
-    }
-    const newNode = { id: nid, type: "component", position, data, parentNode: (parent as any)?.id, extent: parent ? ("parent" as const) : undefined };
-    setNodes((nds) => nds.concat([newNode]));
-  }, [setNodes, findContainerAt, mode]);
-
-  const onDragOver = useCallback((event: DragEvent) => { event.preventDefault(); (event.dataTransfer as DataTransfer).dropEffect = mode === MODES.EDIT ? "move" : "none"; }, [mode]);
-
-  const onNodeDragStop = useCallback((_: any, node: any) => {
-    if (mode !== MODES.EDIT) return;
-    // Re-parent both services and containers, but avoid cycles
-  const parentNode = node.parentNode ? nodes.find((n) => n.id === node.parentNode) : null;
-  const parentAbs = parentNode ? absoluteOf(parentNode) : { x: 0, y: 0 };
-  const absPos = { x: node.position.x + parentAbs.x, y: node.position.y + parentAbs.y + (parentNode ? headerOffsetFor(parentNode) : 0) };
-  const container = findContainerAt(absPos, node.id);
-
-  setNodes((nds) => nds.map((n) => {
-      if (n.id !== node.id) return n;
-      // Snap doors to walls and restrict movement along the wall
-    if (n.type === 'door') {
-        // Doors stay with their existing container; if none, ignore drag result
-        const originalContainer = n.parentNode ? nds.find(p => p.id === n.parentNode) : undefined;
-        if (!originalContainer) return n;
-        if (!originalContainer.data?.features?.firewall) return n;
-        const doorW = Math.round((n.data?.width || DEFAULT_DOOR_WIDTH));
-        const doorH = DEFAULT_DOOR_HEIGHT;
-        const contAbs = absoluteOf(originalContainer);
-        const local = { x: absPos.x - contAbs.x, y: absPos.y - contAbs.y - headerOffsetFor(originalContainer) };
-        const snapped = snapDoorToNearestSide(originalContainer, local, doorW, doorH);
-        return { ...n, parentNode: originalContainer.id, extent: 'parent', position: snapped.position, data: { ...(n.data||{}), side: snapped.side } };
-      }
-      if (container) {
-        // Already inside same container: no recompute (prevents cumulative shift)
-        if (n.parentNode === container.id) return n;
-        if (container.data?.locked) return n; // locked target
-        // forbid network nesting into another network
-        if (n.type==='network' && container.type==='network') return n;
-  const headerOffset = headerOffsetFor(container);
-  const containerAbs = absoluteOf(container);
-        // Determine partition index for new child based on x within container
-        const isNet = container.type==='network';
-        const headerLeft = (container.data?.headerPos||'top')==='left' ? (isNet?NETWORK_HEADER_HEIGHT:CONTAINER_HEADER_HEIGHT) : 0;
-        const partitions = Math.max(1, Math.min(12, parseInt(String(container.data?.partitions ?? 1), 10) || 1));
-        const innerW = (container.data?.width||container.style?.width||container.width||520) - headerLeft;
-        const partW = innerW / partitions;
-        const localX = absPos.x - containerAbs.x - headerLeft;
-        let pIdx = Math.floor(localX / partW); if (pIdx < 0) pIdx = 0; if (pIdx >= partitions) pIdx = partitions - 1;
-        const next: any = {
-          ...n,
-          parentNode: container.id,
-          extent: "parent",
-          // Do not subtract header offset here; positions are in parent-local space from top-left
-          position: { x: absPos.x - containerAbs.x, y: absPos.y - containerAbs.y },
-          data: { ...(n.data||{}), parentPartition: pIdx }
-        };
-        if (n.type==='component' && !n.data?.isContainer && container.type==='network') {
-          const netId = container.data?.netId || container.id;
-          const prev = Array.isArray(n.data?.networks) ? n.data.networks : [];
-          next.data = { ...(n.data||{}), primaryNetwork: netId, networks: Array.from(new Set([...prev, netId])) };
-        }
-        return next;
-      }
-      // Leaving container only if it had one
-      if (n.parentNode) return { ...n, parentNode: undefined, extent: undefined };
-      return n;
-    }));
-  }, [findContainerAt, nodes, setNodes, mode]);
+  // DnD handlers (extracted)
+  const { onDrop, onDragOver, onNodeDragStop } = useMemo(() => createDnDHandlers({
+    mode,
+    MODES,
+    reactFlowWrapper,
+    project,
+    getNodes: () => nodes,
+    setNodes,
+    findContainerAt,
+    headerOffsetFor: (n:any) => headerOffsetFor(n),
+    absoluteOf: (n:any) => absoluteOf(n),
+    DEFAULT_DOOR_WIDTH,
+    DEFAULT_DOOR_HEIGHT,
+    snapDoorToNearestSide,
+  }), [mode, project, nodes, setNodes, findContainerAt]);
 
   // Selection / connect
   const onNodeClick = useCallback((evt: any, node: any) => {
@@ -864,26 +642,7 @@ function DiagramCanvas({
         setNodes((nds) => {
           const targetIds = nds.filter(n=>n.selected).map(n=>n.id);
           if (!targetIds.length) return nds;
-          const subset = nds.filter(n=>targetIds.includes(n.id) && n.type!=='door');
-          const parentId = subset.every(n=>n.parentNode===subset[0].parentNode) ? (subset[0].parentNode||undefined) : undefined;
-          let minX=Infinity,minY=Infinity,maxX=-Infinity,maxY=-Infinity;
-          subset.forEach(n=>{ const abs=absolutePosition(n, nds); const w=(n.style?.width||n.data?.width||n.width||150) as number; const h=(n.style?.height||n.data?.height||n.height||100) as number; minX=Math.min(minX,abs.x); minY=Math.min(minY,abs.y); maxX=Math.max(maxX,abs.x+w); maxY=Math.max(maxY,abs.y+h); });
-          if (!isFinite(minX) || !isFinite(minY)) return nds;
-          const PAD_SIDE=16, PAD_TOP=12, PAD_BOTTOM=16; const HEADER=CONTAINER_HEADER_HEIGHT;
-          const contentW = Math.round(maxX - minX);
-          const contentH = Math.round(maxY - minY);
-          const width = Math.max(200, contentW + PAD_SIDE*2);
-          const height = Math.max(140, HEADER + contentH + PAD_TOP + PAD_BOTTOM);
-          const containerId = `group-${Math.random().toString(36).slice(2,8)}`;
-          const absPos = { x: Math.round(minX - PAD_SIDE), y: Math.round(minY - HEADER - PAD_TOP) };
-          let position = absPos; let extent:any = undefined; let newParentId:any = undefined;
-          if (parentId) {
-            const parent = nds.find(p=>p.id===parentId);
-            if (parent) { const pAbs = absolutePosition(parent, nds); const offY = (parent.type==='network'?NETWORK_HEADER_HEIGHT:(parent.data?.isContainer?CONTAINER_HEADER_HEIGHT:0)); position = { x: absPos.x - pAbs.x, y: absPos.y - pAbs.y - offY }; newParentId = parentId; extent = 'parent'; }
-          }
-          const newContainer:any = { id: containerId, type:'component', position, data:{ idInternal:containerId, label:'Container', color:'#475569', width, height, locked:false, isContainer:true, bgColor:'#ffffff', bgOpacity:0.85 }, style:{ width, height }, parentNode:newParentId, extent };
-          const next = nds.map(n=>{ if (!targetIds.includes(n.id)) return n; const abs=absolutePosition(n, nds); const local={ x: abs.x - absPos.x, y: abs.y - absPos.y }; return { ...n, parentNode: containerId, extent:'parent', position: local } as any; });
-          return next.concat(newContainer);
+          return wrapInContainerUtil(nds, targetIds);
         });
         return;
       }
@@ -892,30 +651,7 @@ function DiagramCanvas({
     if (selection.type === 'node') {
       // Remove container but keep its children at same hierarchy level
       if (patch.removeContainerKeepChildren && (selection.data?.isContainer || selection.nodeType==='network')) {
-        setNodes((nds) => {
-          const container = nds.find(n=>n.id===selection.id);
-          if (!container) return nds;
-          const parentId = container.parentNode;
-          const containerAbs = absolutePosition(container, nds);
-          const headerOffset = container.type==='network' ? NETWORK_HEADER_HEIGHT : (container.data?.isContainer ? CONTAINER_HEADER_HEIGHT : 0);
-          // Reparent children: convert to absolute, then to new parent local coords
-          const children = nds.filter(n=>n.parentNode===selection.id);
-          let next = nds.filter(n=>n.id!==selection.id).map(n=>{
-            if (!children.find(c=>c.id===n.id)) return n;
-            // compute abs pos
-            const abs = absolutePosition(n, nds);
-            if (!parentId) {
-              return { ...n, parentNode: undefined, extent: undefined, position: abs } as any;
-            }
-            const parent = nds.find(p=>p.id===parentId);
-            if (!parent) return { ...n, parentNode: undefined, extent: undefined, position: abs } as any;
-            const parentAbs = absolutePosition(parent, nds);
-            const offY = (parent.type==='network' ? NETWORK_HEADER_HEIGHT : (parent.data?.isContainer ? CONTAINER_HEADER_HEIGHT : 0));
-            const local = { x: abs.x - parentAbs.x, y: abs.y - parentAbs.y - offY };
-            return { ...n, parentNode: parentId, extent: 'parent' as const, position: local } as any;
-          });
-          return next;
-        });
+        setNodes((nds) => removeContainerKeepChildrenUtil(nds, selection.id));
         setSelection(null);
         return;
       }
@@ -924,45 +660,7 @@ function DiagramCanvas({
         setNodes((nds) => {
           const selectedIds = nds.filter(n=>n.selected).map(n=>n.id);
           const targetIds = selectedIds.length ? selectedIds : [selection.id];
-          // Exclure les portes du wrapping pour éviter les incohérences
-          const subset = nds.filter(n=>targetIds.includes(n.id) && n.type!== 'door');
-          if (!subset.length) return nds;
-          // Compute common parent to keep hierarchy consistent
-          const parentId = subset.every(n=>n.parentNode===subset[0].parentNode) ? (subset[0].parentNode||undefined) : undefined;
-          // Compute tight bounds in scene
-          let minX=Infinity,minY=Infinity,maxX=-Infinity,maxY=-Infinity;
-          subset.forEach(n=>{ const abs=absolutePosition(n, nds); const w=(n.style?.width||n.data?.width||n.width||150) as number; const h=(n.style?.height||n.data?.height||n.height||100) as number; minX=Math.min(minX,abs.x); minY=Math.min(minY,abs.y); maxX=Math.max(maxX,abs.x+w); maxY=Math.max(maxY,abs.y+h); });
-          if (!isFinite(minX) || !isFinite(minY)) return nds;
-          // Minimal size with padding + header reserved on top
-          const PAD_SIDE=16, PAD_TOP=12, PAD_BOTTOM=16; const HEADER=CONTAINER_HEADER_HEIGHT;
-          const contentW = Math.round(maxX - minX);
-          const contentH = Math.round(maxY - minY);
-          const width = Math.max(200, contentW + PAD_SIDE*2);
-          const height = Math.max(140, HEADER + contentH + PAD_TOP + PAD_BOTTOM);
-          const containerId = `group-${Math.random().toString(36).slice(2,8)}`;
-          // Container absolute position: reserve header above content
-          const absPos = { x: Math.round(minX - PAD_SIDE), y: Math.round(minY - HEADER - PAD_TOP) };
-          // If parent exists, convert to local
-          let position = absPos; let extent:any = undefined; let newParentId:any = undefined;
-          if (parentId) {
-            const parent = nds.find(p=>p.id===parentId);
-            if (parent) {
-              const pAbs = absolutePosition(parent, nds);
-              const offY = (parent.type==='network'?NETWORK_HEADER_HEIGHT:(parent.data?.isContainer?CONTAINER_HEADER_HEIGHT:0));
-              position = { x: absPos.x - pAbs.x, y: absPos.y - pAbs.y - offY };
-              newParentId = parentId; extent = 'parent';
-            }
-          }
-          const newContainer:any = { id: containerId, type:'component', position, data:{ idInternal:containerId, label:'Container', color:'#475569', width, height, locked:false, isContainer:true, bgColor:'#ffffff', bgOpacity:0.85 }, style:{ width, height }, parentNode:newParentId, extent };
-          // Reparent subset under new container, keep relative positions
-          const next = nds.map(n=>{
-            if (!targetIds.includes(n.id)) return n;
-            const abs = absolutePosition(n, nds);
-            // Convert to local coords: do NOT subtract header; container top already accounts for HEADER
-            const local = { x: abs.x - absPos.x, y: abs.y - absPos.y };
-            return { ...n, parentNode: containerId, extent: 'parent', position: local } as any;
-          });
-          return next.concat(newContainer);
+          return wrapInContainerUtil(nds, targetIds);
         });
         return;
       }
@@ -1290,79 +988,12 @@ function DiagramCanvas({
 
   const onExportPng = useCallback(async () => {
     if (!reactFlowWrapper.current) return;
-    const node = reactFlowWrapper.current.querySelector(".react-flow__viewport") as HTMLElement | null;
-    if (!node) return;
-    // Compute crop bounds: prefer selected node area; fallback to all content
-    const vpRect = node.getBoundingClientRect();
-    const padding = 6; // extra pixels around selection
-    let crop: { x:number; y:number; w:number; h:number } | null = null;
-    try {
-      const scene = getSelectedNodeSceneRect();
-      if (scene) {
-        // If selection exists, temporarily fit it fully into the viewport so off-screen parts are visible in snapshot
-        const targetScale = Math.min((vpRect.width - padding*2) / scene.w, (vpRect.height - padding*2) / scene.h);
-        const tx2 = Math.round((vpRect.width - scene.w * targetScale) / 2 - scene.x * targetScale);
-        const ty2 = Math.round((vpRect.height - scene.h * targetScale) / 2 - scene.y * targetScale);
-        const prevTransform = node.style.transform;
-        const prevOrigin = node.style.transformOrigin;
-        try {
-          node.style.transformOrigin = '0 0';
-          node.style.transform = `matrix(${targetScale}, 0, 0, ${targetScale}, ${tx2}, ${ty2})`;
-          // After fitting, crop exactly around the object centered on screen
-          const objW = Math.ceil(scene.w * targetScale);
-          const objH = Math.ceil(scene.h * targetScale);
-          const cx = Math.max(0, Math.floor((vpRect.width - objW) / 2) - padding);
-          const cy = Math.max(0, Math.floor((vpRect.height - objH) / 2) - padding);
-          const cw = Math.min(Math.ceil(vpRect.width - cx), objW + padding * 2);
-          const ch = Math.min(Math.ceil(vpRect.height - cy), objH + padding * 2);
-          crop = { x: cx, y: cy, w: cw, h: ch };
-          // Small sync to ensure styles applied
-          await new Promise(r=>requestAnimationFrame(()=>r(null)));
-        } finally {
-          // We'll restore after snapshot below
-          // Store to restore later outside of try/catch around snapshot
-          (node as any).__prevTransform = prevTransform;
-          (node as any).__prevOrigin = prevOrigin;
-        }
-      }
-    } catch {}
-    if (!crop) {
-      const elems = [
-        ...Array.from(node.querySelectorAll('.react-flow__node')) as Element[],
-        ...Array.from(node.querySelectorAll('.react-flow__edge')) as Element[],
-      ] as HTMLElement[];
-      let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-      elems.forEach(el => {
-        const r = el.getBoundingClientRect();
-        if (!r.width && !r.height) return;
-        minX = Math.min(minX, r.left - vpRect.left);
-        minY = Math.min(minY, r.top - vpRect.top);
-        maxX = Math.max(maxX, r.right - vpRect.left);
-        maxY = Math.max(maxY, r.bottom - vpRect.top);
-      });
-      if (!isFinite(minX) || !isFinite(minY) || !isFinite(maxX) || !isFinite(maxY)) return; // nothing to export
-      crop = { x: Math.max(0, Math.floor(minX)), y: Math.max(0, Math.floor(minY)), w: Math.ceil(maxX - minX), h: Math.ceil(maxY - minY) };
-    }
-  const pixelRatio = getExportPixelRatio(vpRect.width, vpRect.height);
-  const fullUrl = await exportViewportCropToPng(node, { x: 0, y: 0, w: vpRect.width, h: vpRect.height }, pixelRatio);
-    // Restore original transform if we changed it
-    if ((node as any).__prevTransform !== undefined) {
-      node.style.transform = (node as any).__prevTransform;
-      node.style.transformOrigin = (node as any).__prevOrigin;
-      delete (node as any).__prevTransform;
-      delete (node as any).__prevOrigin;
-    }
-  const base = await new Promise<HTMLImageElement>((resolve)=>{ const im=new Image(); im.onload=()=>resolve(im); im.src=fullUrl; });
-  const imgW = base.width; const imgH = base.height;
-  const sx = Math.max(0, Math.min(imgW, Math.round(crop.x * pixelRatio)));
-  const sy = Math.max(0, Math.min(imgH, Math.round(crop.y * pixelRatio)));
-  const sw = Math.max(1, Math.min(imgW - sx, Math.round(crop.w * pixelRatio)));
-  const sh = Math.max(1, Math.min(imgH - sy, Math.round(crop.h * pixelRatio)));
-  const canvas = document.createElement('canvas');
-  canvas.width = sw; canvas.height = sh;
-  const ctx = canvas.getContext('2d'); if (!ctx) return;
-  ctx.drawImage(base, sx, sy, sw, sh, 0, 0, sw, sh);
-    const dataUrl = canvas.toDataURL('image/png');
+    const viewportEl = reactFlowWrapper.current.querySelector('.react-flow__viewport') as HTMLElement | null;
+    if (!viewportEl) return;
+    const scene = getSelectedNodeSceneRect();
+    const dataUrl = scene
+      ? await fitAndExportSelection(viewportEl, scene, 8)
+      : await exportViewportCropToPng(viewportEl, computeTightBounds(viewportEl));
     const link = document.createElement('a');
     link.download = `architecture-${Date.now()}.png`;
     link.href = dataUrl;
@@ -1514,17 +1145,18 @@ function DiagramCanvas({
       setSelection((s: any) => (s && s.id === node.id ? { ...s, parentNode: undefined, extent: undefined } : s));
     }
   }, [setNodes, isNodeLocked, nodes, mode]);
-  // Multi-drag state and handlers
-  const dragBundleRef = useRef<{
-    baseId: string;
-    parentId?: string | null;
-    start: Record<string, { x: number; y: number }>;
-    partIndex?: Record<string, number>;
-    headerLeft?: number;
-    partitions?: number;
-    partitionWidth?: number;
-    containerWidth?: number;
-  } | null>(null);
+  // Multi-drag handlers (extracted)
+  const { onNodeDragStartMulti, onNodeDrag, onNodeDragStopMulti } = useMultiDrag({
+    nodes,
+    setNodes,
+    mode,
+    MODES,
+    DEFAULT_DOOR_WIDTH,
+    DEFAULT_DOOR_HEIGHT,
+    CONTAINER_HEADER_HEIGHT,
+    NETWORK_HEADER_HEIGHT,
+    snapDoorToNearestSide,
+  });
 
   // =========
   // Cascade delete helpers
@@ -1578,90 +1210,7 @@ function DiagramCanvas({
     collectDescendants,
     showFlash,
   });
-  const onNodeDragStartMulti = useCallback((_: any, node: any) => {
-    const selIds = nodes.filter(n => n.selected).map(n => n.id);
-    const ids = selIds.length ? selIds : [node.id];
-    const parentId = node.parentNode ?? null;
-    const subset = nodes.filter(n => ids.includes(n.id) && (n.parentNode ?? null) === parentId);
-    const start: Record<string, { x: number; y: number }> = {};
-    subset.forEach(n => { start[n.id] = { x: n.position.x, y: n.position.y }; });
-    // Partition context if inside a container
-    let partIndex: Record<string, number> | undefined = undefined;
-    let headerLeft: number | undefined = undefined;
-    let partitions: number | undefined = undefined;
-    let partitionWidth: number | undefined = undefined;
-    let containerWidth: number | undefined = undefined;
-    if (parentId) {
-      const parent = nodes.find(n => n.id === parentId);
-      if (parent) {
-        const isNet = parent.type === 'network';
-        const headerPos = (parent.data?.headerPos||'top');
-        headerLeft = headerPos==='left' ? (isNet?NETWORK_HEADER_HEIGHT:CONTAINER_HEADER_HEIGHT) : 0;
-        const width = (parent.data?.width||parent.style?.width||parent.width||520) as number;
-        containerWidth = width;
-        partitions = Math.max(1, Math.min(12, parseInt(String(parent.data?.partitions ?? 1), 10) || 1));
-        const innerW = width - (headerLeft||0);
-        partitionWidth = innerW / partitions;
-        partIndex = {};
-        subset.forEach(n => {
-          let idx = (n as any).data?.parentPartition;
-          if (typeof idx !== 'number' || isNaN(idx)) {
-            const localX = Math.max(0, n.position.x - (headerLeft||0));
-            idx = Math.floor(localX / (partitionWidth||innerW));
-          }
-          if (idx < 0) idx = 0; if (idx >= (partitions||1)) idx = (partitions||1) - 1;
-          partIndex![n.id] = idx;
-        });
-      }
-    }
-    dragBundleRef.current = { baseId: node.id, parentId, start, partIndex, headerLeft, partitions, partitionWidth, containerWidth };
-  }, [nodes]);
-  const onNodeDrag = useCallback((evt: any, node: any) => {
-    if (mode !== MODES.EDIT) return;
-    const ref = dragBundleRef.current; if (!ref) return;
-    const baseStart = ref.start[node.id]; if (!baseStart) return;
-    const dx = node.position.x - baseStart.x; const dy = node.position.y - baseStart.y;
-    if (dx === 0 && dy === 0) return;
-    setNodes((nds) => nds.map(n => {
-      if (!ref.start[n.id]) return n; // only move captured ones
-      // Doors: while dragging, stay snapped to the firewall ring of their own container
-      if (n.type === 'door') {
-        const parent = n.parentNode ? nds.find(p => p.id === n.parentNode) : undefined;
-        if (!parent) return n;
-        if (!parent.data?.features?.firewall) return n;
-        const doorW = Math.round((n.data?.width || DEFAULT_DOOR_WIDTH));
-        const doorH = DEFAULT_DOOR_HEIGHT;
-        const startLocal = ref.start[n.id];
-        const localX = startLocal.x + dx;
-        const localY = startLocal.y + dy;
-        const snapped = snapDoorToNearestSide(parent, { x: localX, y: localY }, doorW, doorH);
-        return { ...n, position: snapped.position, data: { ...(n as any).data, side: snapped.side } } as any;
-      }
-      // propose new position
-      let newX = ref.start[n.id].x + dx;
-      let newY = ref.start[n.id].y + dy;
-  // If partitioned, clamp X within own partition bounds (not for doors)
-  if (n.type !== 'door' && ref.parentId && ref.partitions && ref.partitionWidth && ref.headerLeft !== undefined) {
-        const nodeW = (n as any).width || (n as any).data?.width || (n as any).style?.width || 150;
-        const pad = 4;
-        if (evt?.shiftKey) {
-          // Allow crossing partitions; recompute partition index based on center X
-          const centerX = newX + nodeW / 2;
-          let idx = Math.floor((centerX - (ref.headerLeft||0)) / (ref.partitionWidth||1));
-          if (idx < 0) idx = 0; if (idx >= (ref.partitions||1)) idx = (ref.partitions||1) - 1;
-          // store live new index so all nodes in bundle keep their column
-          if (!ref.partIndex) ref.partIndex = {};
-          ref.partIndex[n.id] = idx;
-        }
-        const idx = ref.partIndex?.[n.id] ?? 0;
-        const left = (ref.headerLeft||0) + idx * (ref.partitionWidth||1) + 0;
-        const right = (ref.headerLeft||0) + (idx + 1) * (ref.partitionWidth||1);
-        newX = Math.max(left + pad, Math.min(newX, right - nodeW - pad));
-      }
-      return { ...n, position: { x: newX, y: newY }, data: { ...(n as any).data, parentPartition: ref.partIndex?.[n.id] ?? (n as any).data?.parentPartition } } as any;
-    }));
-  }, [setNodes, mode]);
-  const onNodeDragStopMulti = useCallback(() => { dragBundleRef.current = null; }, []);
+  // old inline multi-drag handlers removed (moved to useMultiDrag)
 
   // Clear selection and enforce read-only when switching to view mode
   useEffect(() => {
