@@ -141,7 +141,7 @@ const ComponentNode = memo(({ id, data, selected, isConnectable }: ComponentNode
         setNodesFn((nds: any[]) => nds.map(n => n.id === id ? { ...n, draggable: false, data: { ...n.data, width: newW, height: newH }, style: { ...(n.style||{}), width: newW, height: newH } } : n));
       }
     };
-    const up = () => { window.removeEventListener('mousemove', move); window.removeEventListener('mouseup', up); document.body.classList.remove('resizing-container'); const setNodesFn = (window as any).__setDiagramNodes; if (typeof setNodesFn === 'function') setNodesFn((nds: any[]) => nds.map(n => n.id === id ? { ...n, draggable: true } : n)); };
+    const up = () => { window.removeEventListener('mousemove', move); window.removeEventListener('mouseup', up); document.body.classList.remove('resizing-container'); const setNodesFn = (window as any).__setDiagramNodes; if (typeof setNodesFn === 'function') setNodesFn((nds: any[]) => nds.map(n => n.id === id ? { ...n, draggable: undefined as any } : n)); };
     window.addEventListener('mousemove', move); window.addEventListener('mouseup', up);
   };
 

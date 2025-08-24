@@ -16,7 +16,7 @@ export function useSelectionManager(nodes: any[], edgeColorMode: string, setNode
         setSelection((s: any) => ({ ...s, parentNode: undefined, extent: undefined }));
         return;
       }
-      setNodes((nds: any[]) => nds.map((n) => (n.id === selection.id ? { ...n, ...patch, data: { ...n.data, ...(patch.data || {}) }, draggable: patch?.data?.locked !== undefined ? !patch.data.locked : n.draggable } : n)));
+  setNodes((nds: any[]) => nds.map((n) => (n.id === selection.id ? { ...n, ...patch, data: { ...n.data, ...(patch.data || {}) } } : n)));
       setSelection((s: any) => ({ ...s, ...patch, data: { ...s.data, ...(patch.data || {}) } }));
       if (patch?.data?.color && edgeColorMode === EDGE_COLOR_MODE.BY_SOURCE) {
         setEdges((eds: any[]) => eds.map((e) => e.source === selection.id ? { ...e, style: { ...(e.style || {}), stroke: patch.data.color } } : e));

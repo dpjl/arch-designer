@@ -5,10 +5,11 @@ import { CONTAINER_HEADER_HEIGHT, NETWORK_HEADER_HEIGHT } from '../constants';
 
 export const useAutoLayout = (globalConfig: AutoLayoutConfig) => {
   // Fonction pour vérifier si un nœud doit être bloqué
-  const isNodeLocked = useCallback((node: Node, allNodes: Node[]): boolean => {
+  const isNodeLocked = useCallback((node: Node | undefined, allNodes: Node[] = []): boolean => {
+    if (!node) return false;
     if (!node.parentNode) return false;
     
-    const parentNode = allNodes.find(n => n.id === node.parentNode);
+  const parentNode = allNodes.find(n => n.id === node.parentNode);
     if (!parentNode || !parentNode.data?.autoLayout?.enabled) return false;
     
     return true;

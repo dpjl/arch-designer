@@ -41,6 +41,7 @@ import { ThemeProvider } from './theme/ThemeProvider';
 import { useDiagramHistory } from './diagram/hooks/useDiagramHistory';
 import { useDiagramSelection } from './diagram/hooks/useDiagramSelection';
 import { useViewModePan } from './diagram/hooks/useViewModePan';
+import { useDiagramInteractions } from './diagram/hooks/useDiagramInteractions';
 import { useDiagramShortcuts } from './diagram/hooks/useDiagramShortcuts';
 import { useMultiDrag } from './diagram/hooks/useMultiDrag';
 import { applyZIndexHierarchy, enforceContainerSelectedZ, absolutePosition, headerOffsetFor as headerOffsetForUtil } from './diagram/layout-utils';
@@ -211,6 +212,7 @@ function DiagramCanvas({
   }, [instanceGroups]);
   const { project, fitView, getViewport, setViewport, getNodes: rfGetNodes } = useReactFlow();
   const [mode, setMode] = useState<typeof MODES[keyof typeof MODES]>(MODES.EDIT);
+  // (déplacé après l'init des nodes/edges/selection)
   // History (refactored using hook) - will be initialized after nodes/edges state
   const [historyFlash, setHistoryFlash] = useState<string | null>(null);
   const showFlash = useCallback((msg: string) => { setHistoryFlash(msg); setTimeout(() => setHistoryFlash(c => c === msg ? null : c), 900); }, []);
@@ -279,6 +281,26 @@ function DiagramCanvas({
   // Keyboard shortcuts (undo/redo/select all/save/copy-paste)
   const { selection, setSelection, selectNode } = useDiagramSelection({ setNodes, setEdges, showFlash, enableKeyboardDelete: mode === MODES.EDIT, getNodes: () => nodes, getEdges: () => edges });
   const { applyAutoLayout, isNodeLocked } = useAutoLayout(globalAutoLayoutConfig);
+  // Interactions centralisées (clavier, touch, gating drag, clic Shift)
+  const {
+    ctrlPressed,
+    shiftPressed,
+    touchDragActive,
+    onWrapperTouchStart,
+    clearTouchState,
+    onNodeClick: onNodeClickInteraction,
+    onNodeDragStart: onNodeDragStartInteraction,
+    rfInteraction,
+  } = useDiagramInteractions({
+    mode,
+    MODES,
+    nodes,
+    setNodes,
+    setSelection,
+    isNodeLocked,
+    CONTAINER_HEADER_HEIGHT,
+    NETWORK_HEADER_HEIGHT,
+  });
   
   const [isDark, setIsDark] = useState(false);
   const [jsonEditorOpen, setJsonEditorOpen] = useState(false);
@@ -375,6 +397,20 @@ function DiagramCanvas({
   
   // Track changes
   useEffect(()=>{ commitIfChanged(nodes, edges); }, [nodes, edges, commitIfChanged]);
+  // One-time cleanup: remove any persisted node.draggable flags so global gating applies uniformly
+  const cleanedDraggableRef = useRef(false);
+  useEffect(() => {
+    if (cleanedDraggableRef.current) return;
+    setNodes((nds) => {
+      let changed = false;
+      const next = nds.map((n:any) => {
+        if (typeof n.draggable === 'boolean') { changed = true; const { draggable, ...rest } = n as any; return { ...rest, draggable: undefined as any }; }
+        return n;
+      });
+      cleanedDraggableRef.current = true;
+      return changed ? next : nds;
+    });
+  }, [setNodes]);
   // Keyboard delete handled inside useDiagramSelection when enabled (disabled here for duplication avoidance)
 
   // Node selection handled by hook
@@ -568,12 +604,7 @@ function DiagramCanvas({
   }), [mode, project, nodes, setNodes, findContainerAt]);
 
   // Selection / connect
-  const onNodeClick = useCallback((evt: any, node: any) => {
-    if (mode !== MODES.EDIT) return;
-    // Let React Flow handle additive selection when Shift is held
-    if (evt?.shiftKey) return;
-    selectNode(node);
-  }, [mode, selectNode]);
+  const onNodeClick = useCallback((evt: any, node: any) => onNodeClickInteraction(evt, node, selectNode), [onNodeClickInteraction, selectNode]);
 
   const onEdgeClick = useCallback((_: any, edge: any) => { if (mode === MODES.EDIT) setSelection({ ...edge, type: "edge" }); }, [mode, setSelection]);
 
@@ -812,7 +843,7 @@ function DiagramCanvas({
       // Application du patch (logique de mise à jour réorganisée plus haut)
       if (!patch.data) {
         // Si pas de data, application normale
-        setNodes((nds) => nds.map((n) => (n.id === selection.id ? { ...n, ...patch, draggable: patch?.data?.locked !== undefined ? !patch.data.locked : n.draggable } : n)));
+  setNodes((nds) => nds.map((n) => (n.id === selection.id ? { ...n, ...patch } : n)));
         setSelection((s: any) => ({ ...s, ...patch }));
       }
       
@@ -882,8 +913,7 @@ function DiagramCanvas({
     setSelection(null);
   }, [selection, setEdges, setSelection]);
 
-  const onNodeDoubleClick = useCallback((_: any, node: any) => { if (mode !== MODES.EDIT) return; const label = prompt("Label", node.data?.label || ""); if (label !== null) setNodes((nds) => nds.map((n) => (n.id === node.id ? { ...n, data: { ...n.data, label } } : n))); }, [mode, setNodes]);
-  const onEdgeDoubleClick = useCallback((_: any, edge: any) => { if (mode !== MODES.EDIT) return; const label = prompt("Label", edge.label || ""); if (label !== null) setEdges((eds) => eds.map((e) => (e.id === edge.id ? { ...e, label } : e))); }, [mode, setEdges]);
+  // Double-click no longer triggers rename; zoom on double click disabled in ReactFlow props
 
   // Persistence
   const onSave = useCallback(() => { 
@@ -1064,16 +1094,22 @@ function DiagramCanvas({
 
   const onNodeDragStart = useCallback((evt: any, node: any) => {
   if (mode !== MODES.EDIT) { evt.stopPropagation(); return; }
+  // Only allow drag when Ctrl is held (desktop) or touch long-press is active (mobile)
+  // Shift should never trigger node drag (reserved for selection rectangle)
+  const allowDrag = (!evt?.shiftKey) && (!!evt?.ctrlKey || !!evt?.metaKey || touchDragActive);
+  if (!allowDrag) { evt.stopImmediatePropagation?.(); evt.stopPropagation(); return false; }
   if (document.body.classList.contains('resizing-container')) { evt.stopImmediatePropagation?.(); evt.stopPropagation(); return false; }
   
     // Bloquer le mouvement si l'auto-layout est activé pour ce nœud
-    if (isNodeLocked(node, nodes)) {
+  let locked = false;
+  try { locked = isNodeLocked?.(node, nodes) || false; } catch {}
+  if (locked) {
       evt.stopImmediatePropagation?.(); 
       evt.stopPropagation(); 
       return false;
     }
     
-    if (evt?.altKey && node.parentNode) {
+  if (evt?.altKey && node?.parentNode) {
       if (node.type === 'door') {
         return; // Doors cannot be detached from their container
       }
@@ -1086,6 +1122,7 @@ function DiagramCanvas({
       }));
       setSelection((s: any) => (s && s.id === node.id ? { ...s, parentNode: undefined, extent: undefined } : s));
     }
+    return true;
   }, [setNodes, isNodeLocked, nodes, mode]);
   // Multi-drag handlers (extracted)
   const { onNodeDragStartMulti, onNodeDrag, onNodeDragStopMulti } = useMultiDrag({
@@ -1163,6 +1200,8 @@ function DiagramCanvas({
 
   const viewLocked = mode === MODES.VIEW;
   const { isPanning, onMouseDown: onWrapperMouseDown } = useViewModePan(viewLocked, getViewport, setViewport);
+  // Touch long-press to enable node dragging on mobile (otherwise one-finger pans)
+  const clearLongPress = clearTouchState;
   const [showLeftPanel, setShowLeftPanel] = useState(true);
   const [showRightPanel, setShowRightPanel] = useState(true);
   // Hydration note: ne pas lire localStorage dans l'initialisation useState
@@ -1269,6 +1308,9 @@ function DiagramCanvas({
         <div
           ref={reactFlowWrapper}
           onMouseDownCapture={onWrapperMouseDown}
+          onTouchStartCapture={onWrapperTouchStart}
+          onTouchEndCapture={clearLongPress}
+          onTouchCancelCapture={clearLongPress}
           className={`h-full ${viewLocked ? "cursor-" + (isPanning ? "grabbing" : "grab") : ""} reactflow-surface dark:[&_.react-flow__attribution]:bg-transparent`}
         >
                   <ReactFlow
@@ -1286,21 +1328,24 @@ function DiagramCanvas({
                     edgeTypes={edgeTypes as any}
                     onNodeClick={onNodeClick}
                     onEdgeClick={onEdgeClick}
-                    onNodeDoubleClick={onNodeDoubleClick}
-                    onEdgeDoubleClick={onEdgeDoubleClick}
-                    onNodeDragStop={(e,n)=>{ onNodeDragStop(e,n); onNodeDragStopMulti(); }}
-                    onNodeDragStart={(e,n)=>{ onNodeDragStart(e,n); onNodeDragStartMulti(e,n); }}
+                            // double-click disabled (no rename, and zoom disabled below)
+                    onNodeDragStop={(e,n)=>{ onNodeDragStop(e,n); onNodeDragStopMulti(); clearTouchState(); }}
+                    onNodeDragStart={(e,n)=>{ const ok = onNodeDragStartInteraction(e,n) !== false; if (ok) onNodeDragStartMulti(e,n); }}
                     onNodeDrag={onNodeDrag}
                     connectionMode={ConnectionMode.Loose}
                     connectionLineType={ConnectionLineType.Straight}
                     minZoom={0.1}
                     maxZoom={3}
-                    nodesDraggable={mode === MODES.EDIT}
+                            // Pan by default; nodes draggable si Ctrl/Shift/long-press
+                            nodesDraggable={rfInteraction.nodesDraggable}
                     nodesConnectable={mode === MODES.EDIT}
                     elementsSelectable={mode === MODES.EDIT}
-                    selectNodesOnDrag={mode === MODES.EDIT}
-                    panOnDrag={false}
-                    selectionOnDrag
+                            // Require Shift for selection box; don't start selection on plain drag
+                            selectNodesOnDrag={false}
+                            panOnDrag={rfInteraction.panOnDrag}
+                            selectionOnDrag={rfInteraction.selectionOnDrag}
+                            selectionKeyCode={rfInteraction.selectionKeyCode}
+                            zoomOnDoubleClick={false}
                     defaultEdgeOptions={{
                       type: 'default',
                       style: { strokeWidth: 2, stroke: '#64748b' },

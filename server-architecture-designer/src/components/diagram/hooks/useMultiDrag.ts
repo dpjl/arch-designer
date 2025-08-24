@@ -25,9 +25,10 @@ export function useMultiDrag({ nodes, setNodes, mode, MODES, DEFAULT_DOOR_WIDTH,
   } | null>(null);
 
   const onNodeDragStartMulti = useCallback((_: any, node: any) => {
+    if (!node) return;
     const selIds = nodes.filter(n => n.selected).map(n => n.id);
     const ids = selIds.length ? selIds : [node.id];
-    const parentId = node.parentNode ?? null;
+    const parentId = node?.parentNode ?? null;
     const subset = nodes.filter(n => ids.includes(n.id) && (n.parentNode ?? null) === parentId);
     const start: Record<string, { x: number; y: number }> = {};
     subset.forEach(n => { start[n.id] = { x: n.position.x, y: n.position.y }; });
@@ -37,7 +38,7 @@ export function useMultiDrag({ nodes, setNodes, mode, MODES, DEFAULT_DOOR_WIDTH,
     let partitions: number | undefined = undefined;
     let partitionWidth: number | undefined = undefined;
     let containerWidth: number | undefined = undefined;
-    if (parentId) {
+  if (parentId) {
       const parent = nodes.find(n => n.id === parentId);
       if (parent) {
         const isNet = parent.type === 'network';
@@ -66,7 +67,7 @@ export function useMultiDrag({ nodes, setNodes, mode, MODES, DEFAULT_DOOR_WIDTH,
   const onNodeDrag = useCallback((evt: any, node: any) => {
     if (mode !== MODES.EDIT) return;
     const ref = dragBundleRef.current; if (!ref) return;
-    const baseStart = ref.start[node.id]; if (!baseStart) return;
+  const baseStart = ref.start?.[node?.id]; if (!baseStart) return;
     const dx = node.position.x - baseStart.x; const dy = node.position.y - baseStart.y;
     if (dx === 0 && dy === 0) return;
     setNodes((nds: any[]) => nds.map((n: any) => {
@@ -88,7 +89,8 @@ export function useMultiDrag({ nodes, setNodes, mode, MODES, DEFAULT_DOOR_WIDTH,
       if (n.type !== 'door' && ref.parentId && ref.partitions && ref.partitionWidth && ref.headerLeft !== undefined) {
         const nodeW = (n as any).width || (n as any).data?.width || (n as any).style?.width || 150;
         const pad = 4;
-        if (evt?.shiftKey) {
+  // Shift maintenu: autoriser le changement de partition pendant le drag
+  if (evt?.shiftKey) {
           const centerX = newX + nodeW / 2;
           let idx = Math.floor((centerX - (ref.headerLeft || 0)) / (ref.partitionWidth || 1));
           if (idx < 0) idx = 0; if (idx >= (ref.partitions || 1)) idx = (ref.partitions || 1) - 1;
