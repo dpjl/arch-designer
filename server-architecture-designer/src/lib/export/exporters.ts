@@ -74,6 +74,13 @@ export async function exportFullDiagram(viewportEl: HTMLElement, scene: Rect, pa
   const root = (viewportEl.closest('.react-flow') as HTMLElement) || (viewportEl.closest('.react-flow__renderer') as HTMLElement) || viewportEl;
   const cloneRoot = root.cloneNode(true) as HTMLElement;
   cloneRoot.classList.add('rf-exporting');
+  // Strip edit-only UI from the clone so it doesn't appear in print/export
+  try {
+    const editOnly = cloneRoot.querySelectorAll(
+      '.react-flow__minimap, .react-flow__background, .react-flow__controls, .react-flow__attribution'
+    );
+    editOnly.forEach((el) => el.parentElement?.removeChild(el));
+  } catch {}
   // Apply transform to the cloned viewport inside the cloned root
   const vpClone = cloneRoot.querySelector('.react-flow__viewport') as HTMLElement | null;
   const target = vpClone || cloneRoot;
