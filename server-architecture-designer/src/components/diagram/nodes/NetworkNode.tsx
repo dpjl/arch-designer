@@ -3,6 +3,7 @@ import React, { memo } from 'react';
 import { Handle, Position } from 'reactflow';
 import { CONTAINER_HEADER_HEIGHT, NETWORK_HEADER_HEIGHT, GRID_SIZE } from '../constants';
 import { hexToRgba, autoTextColor } from '../diagram-helpers';
+import { NetworkShapeWrapper } from '../utils/NetworkShapeWrapper';
 
 interface NetworkNodeProps { id: string; data: any; selected: boolean; isConnectable: boolean; }
 
@@ -30,50 +31,126 @@ const NetworkNode = memo(({ id, data, selected, isConnectable }: NetworkNodeProp
     const toHex = (n:number) => n.toString(16).padStart(2,'0');
     return `#${toHex(r)}${toHex(g)}${toHex(b2)}`;
   };
-  const handleSize = 16;
-  const showHandles = selected;
   const startResize = (e: React.MouseEvent, dir: string) => {
     e.preventDefault(); e.stopPropagation();
     if ((e.nativeEvent as any)?.stopImmediatePropagation) (e.nativeEvent as any).stopImmediatePropagation();
     const startX = (e as any).clientX, startY = (e as any).clientY; const startW = width, startH = height;
     const lockedAspect = !!data?.aspect?.locked;
     const aspectRatio = (typeof data?.aspect?.ratio === 'number' && data.aspect.ratio > 0) ? data.aspect.ratio : (startW > 0 && startH > 0 ? startW / startH : undefined);
+    const isLShape = data?.shape === 'l-shape';
+    const currentLShape = data?.lShape;
+    
     document.body.classList.add('resizing-container');
-  const move = (ev: MouseEvent) => {
+    
+    const move = (ev: MouseEvent) => {
       let dw = ev.clientX - startX; let dh = ev.clientY - startY;
       let newW = startW; let newH = startH;
-      if (dir.includes('e')) newW = Math.max(200, startW + dw);
-      if (dir.includes('s')) newH = Math.max(140, startH + dh);
-      if (dir.includes('w')) newW = Math.max(200, startW - dw);
-      if (dir.includes('n')) newH = Math.max(140, startH - dh);
-      if (lockedAspect && aspectRatio && aspectRatio > 0) {
-        if (dir === 'e' || dir === 'w') {
-          newH = Math.max(140, Math.round(newW / aspectRatio));
-        } else if (dir === 's' || dir === 'n') {
-          newW = Math.max(200, Math.round(newH * aspectRatio));
-        } else {
-          if (Math.abs(dw) >= Math.abs(dh)) newH = Math.max(140, Math.round(newW / aspectRatio));
-          else newW = Math.max(200, Math.round(newH * aspectRatio));
+      let newLShape = currentLShape ? { ...currentLShape } : undefined;
+      
+      // Handle L-shape specific resize handles
+      if (dir.startsWith('cut-') && isLShape && newLShape) {
+        if (dir === 'cut-w') {
+          if (newLShape.cutCorner === 'top-left' || newLShape.cutCorner === 'bottom-left') {
+            const newCutWidth = Math.max(20, Math.min(startW - 20, (currentLShape?.cutWidth || 120) + dw));
+            newLShape.cutWidth = newCutWidth;
+          }
+        } else if (dir === 'cut-e') {
+          if (newLShape.cutCorner === 'top-right' || newLShape.cutCorner === 'bottom-right') {
+            const newCutWidth = Math.max(20, Math.min(startW - 20, (currentLShape?.cutWidth || 120) - dw));
+            newLShape.cutWidth = newCutWidth;
+          }
+        } else if (dir === 'cut-n') {
+          if (newLShape.cutCorner === 'top-left' || newLShape.cutCorner === 'top-right') {
+            const newCutHeight = Math.max(20, Math.min(startH - 20, (currentLShape?.cutHeight || 80) + dh));
+            newLShape.cutHeight = newCutHeight;
+          }
+        } else if (dir === 'cut-s') {
+          if (newLShape.cutCorner === 'bottom-left' || newLShape.cutCorner === 'bottom-right') {
+            const newCutHeight = Math.max(20, Math.min(startH - 20, (currentLShape?.cutHeight || 80) - dh));
+            newLShape.cutHeight = newCutHeight;
+          }
+        }
+      } else {
+        // Standard resize handles
+        if (dir.includes('e')) newW = Math.max(200, startW + dw);
+        if (dir.includes('s')) newH = Math.max(140, startH + dh);
+        if (dir.includes('w')) newW = Math.max(200, startW - dw);
+        if (dir.includes('n')) newH = Math.max(140, startH - dh);
+        
+        if (lockedAspect && aspectRatio && aspectRatio > 0) {
+          if (dir === 'e' || dir === 'w') {
+            newH = Math.max(140, Math.round(newW / aspectRatio));
+          } else if (dir === 's' || dir === 'n') {
+            newW = Math.max(200, Math.round(newH * aspectRatio));
+          } else {
+            if (Math.abs(dw) >= Math.abs(dh)) newH = Math.max(140, Math.round(newW / aspectRatio));
+            else newW = Math.max(200, Math.round(newH * aspectRatio));
+          }
+        }
+        
+        // Adjust L-shape cut dimensions if container is resized
+        if (isLShape && newLShape) {
+          newLShape.cutWidth = Math.min(newLShape.cutWidth, newW - 20);
+          newLShape.cutHeight = Math.min(newLShape.cutHeight, newH - 20);
         }
       }
+      
       try {
-        if ((window as any).__snapEnabled) {
+        if ((window as any).__snapEnabled && !dir.startsWith('cut-')) {
           newW = Math.max(200, Math.round(newW / GRID_SIZE) * GRID_SIZE);
           newH = Math.max(140, Math.round(newH / GRID_SIZE) * GRID_SIZE);
         }
       } catch {}
+      
       const setNodesFn = (window as any).__setDiagramNodes;
       if (typeof setNodesFn === 'function') {
-        setNodesFn((nds: any[]) => nds.map(n => n.id === id ? { ...n, draggable: false, data: { ...n.data, width: newW, height: newH }, style: { ...(n.style||{}), width: newW, height: newH } } : n));
+        setNodesFn((nds: any[]) => nds.map(n => n.id === id ? { 
+          ...n, 
+          draggable: false, 
+          data: { 
+            ...n.data, 
+            width: newW, 
+            height: newH,
+            lShape: newLShape 
+          }, 
+          style: { 
+            ...(n.style||{}), 
+            width: newW, 
+            height: newH 
+          } 
+        } : n));
       }
     };
-    const up = () => { window.removeEventListener('mousemove', move); window.removeEventListener('mouseup', up); document.body.classList.remove('resizing-container'); const setNodesFn = (window as any).__setDiagramNodes; if (typeof setNodesFn === 'function') setNodesFn((nds: any[]) => nds.map(n => n.id === id ? { ...n, draggable: undefined as any } : n)); };
-    window.addEventListener('mousemove', move); window.addEventListener('mouseup', up);
+    
+    const up = () => { 
+      window.removeEventListener('mousemove', move); 
+      window.removeEventListener('mouseup', up); 
+      document.body.classList.remove('resizing-container'); 
+      const setNodesFn = (window as any).__setDiagramNodes; 
+      if (typeof setNodesFn === 'function') {
+        setNodesFn((nds: any[]) => nds.map(n => n.id === id ? { ...n, draggable: undefined as any } : n)); 
+      }
+    };
+    
+    window.addEventListener('mousemove', move); 
+    window.addEventListener('mouseup', up);
   };
   return (
     <div className="relative" style={{ width, height }}>
       {selected && <div className="absolute inset-0 -m-1 rounded-2xl ring-2 ring-blue-500 pointer-events-none" />}
-  <div className="rounded-2xl relative border shadow-sm overflow-visible" data-partitions={partitions} style={{ borderColor: color, width: '100%', height: '100%' }}>
+      
+      <NetworkShapeWrapper
+        width={width}
+        height={height}
+        borderColor={color}
+        bg={bgTint}
+        shape={data?.shape || 'rectangle'}
+        lShape={data?.lShape}
+        selected={selected}
+        id={id}
+        partitions={partitions}
+        onResize={startResize}
+      >
         {/* Connection handles for network links - always present for React Flow but visually hidden when not selected */}
         <Handle 
           type="target" 
@@ -176,14 +253,7 @@ const NetworkNode = memo(({ id, data, selected, isConnectable }: NetworkNodeProp
             })}
           </div>
         )}
-        {showHandles && (
-          <>
-            <div data-resize onMouseDownCapture={(e)=>startResize(e,'e')} className="absolute top-1/2 right-0 -translate-y-1/2 translate-x-1/2 cursor-ew-resize bg-blue-500 hover:bg-blue-600 border-2 border-white hover:border-blue-200 rounded-full shadow-lg hover:shadow-xl transition-all duration-150 z-10" style={{ width: handleSize, height: handleSize }} />
-            <div data-resize onMouseDownCapture={(e)=>startResize(e,'s')} className="absolute bottom-0 left-1/2 -translate-x-1/2 translate-y-1/2 cursor-ns-resize bg-blue-500 hover:bg-blue-600 border-2 border-white hover:border-blue-200 rounded-full shadow-lg hover:shadow-xl transition-all duration-150 z-10" style={{ width: handleSize, height: handleSize }} />
-            <div data-resize onMouseDownCapture={(e)=>startResize(e,'se')} className="absolute bottom-0 right-0 translate-x-1/3 translate-y-1/3 cursor-nwse-resize bg-blue-600 hover:bg-blue-700 border-2 border-white hover:border-blue-200 rounded-md shadow-lg hover:shadow-xl transition-all duration-150 z-10" style={{ width: handleSize+2, height: handleSize+2 }} />
-          </>
-        )}
-      </div>
+      </NetworkShapeWrapper>
     </div>
   );
 });

@@ -8,6 +8,7 @@ import { useGroups } from '@/contexts/GroupsContext';
 import { hexToRgba, autoTextColor } from '../diagram-helpers';
 import { getBrickTexture } from '../firewall-texture';
 import { effectiveBorderColor, effectiveBgColor, isAuto } from '../color-utils';
+import { ContainerShapeWrapper } from '../utils/ContainerShapeWrapper';
 
 // getBrickTexture now provided by shared utility
 
@@ -105,44 +106,113 @@ const ComponentNode = memo(({ id, data, selected, isConnectable }: ComponentNode
     const startX = e.clientX, startY = e.clientY; const startW = width, startH = height;
     const lockedAspect = !!data?.aspect?.locked;
     const aspectRatio = (typeof data?.aspect?.ratio === 'number' && data.aspect.ratio > 0) ? data.aspect.ratio : (startW > 0 && startH > 0 ? startW / startH : undefined);
+    const isLShape = data?.shape === 'l-shape';
+    const currentLShape = data?.lShape;
+    
     document.body.classList.add('resizing-container');
-  const move = (ev: MouseEvent) => {
+    
+    const move = (ev: MouseEvent) => {
       let dw = ev.clientX - startX; let dh = ev.clientY - startY;
       let newW = startW; let newH = startH;
-      if (dir.includes('e')) newW = Math.max(200, startW + dw);
-      if (dir.includes('s')) newH = Math.max(140, startH + dh);
-      if (dir.includes('w')) newW = Math.max(200, startW - dw);
-      if (dir.includes('n')) newH = Math.max(140, startH - dh);
-      // Maintain aspect if locked
-      if (lockedAspect && aspectRatio && aspectRatio > 0) {
-        // Choose the dimension primarily adjusted by the handle
-        if (dir === 'e' || dir === 'w') {
-          newH = Math.max(140, Math.round(newW / aspectRatio));
-        } else if (dir === 's' || dir === 'n') {
-          newW = Math.max(200, Math.round(newH * aspectRatio));
-        } else {
-          // corner: pick whichever delta is larger to avoid jitter
-          if (Math.abs(dw) >= Math.abs(dh)) {
-            newH = Math.max(140, Math.round(newW / aspectRatio));
-          } else {
-            newW = Math.max(200, Math.round(newH * aspectRatio));
+      let newLShape = currentLShape ? { ...currentLShape } : undefined;
+      
+      // Handle L-shape specific resize handles
+      if (dir.startsWith('cut-') && isLShape && newLShape) {
+        if (dir === 'cut-w') {
+          // Adjust cut width for left-side cuts
+          if (newLShape.cutCorner === 'top-left' || newLShape.cutCorner === 'bottom-left') {
+            const newCutWidth = Math.max(20, Math.min(startW - 20, (currentLShape?.cutWidth || 120) + dw));
+            newLShape.cutWidth = newCutWidth;
+          }
+        } else if (dir === 'cut-e') {
+          // Adjust cut width for right-side cuts
+          if (newLShape.cutCorner === 'top-right' || newLShape.cutCorner === 'bottom-right') {
+            const newCutWidth = Math.max(20, Math.min(startW - 20, (currentLShape?.cutWidth || 120) - dw));
+            newLShape.cutWidth = newCutWidth;
+          }
+        } else if (dir === 'cut-n') {
+          // Adjust cut height for top cuts
+          if (newLShape.cutCorner === 'top-left' || newLShape.cutCorner === 'top-right') {
+            const newCutHeight = Math.max(20, Math.min(startH - 20, (currentLShape?.cutHeight || 80) + dh));
+            newLShape.cutHeight = newCutHeight;
+          }
+        } else if (dir === 'cut-s') {
+          // Adjust cut height for bottom cuts
+          if (newLShape.cutCorner === 'bottom-left' || newLShape.cutCorner === 'bottom-right') {
+            const newCutHeight = Math.max(20, Math.min(startH - 20, (currentLShape?.cutHeight || 80) - dh));
+            newLShape.cutHeight = newCutHeight;
           }
         }
+      } else {
+        // Standard resize handles
+        if (dir.includes('e')) newW = Math.max(200, startW + dw);
+        if (dir.includes('s')) newH = Math.max(140, startH + dh);
+        if (dir.includes('w')) newW = Math.max(200, startW - dw);
+        if (dir.includes('n')) newH = Math.max(140, startH - dh);
+        
+        // Maintain aspect if locked
+        if (lockedAspect && aspectRatio && aspectRatio > 0) {
+          if (dir === 'e' || dir === 'w') {
+            newH = Math.max(140, Math.round(newW / aspectRatio));
+          } else if (dir === 's' || dir === 'n') {
+            newW = Math.max(200, Math.round(newH * aspectRatio));
+          } else {
+            if (Math.abs(dw) >= Math.abs(dh)) {
+              newH = Math.max(140, Math.round(newW / aspectRatio));
+            } else {
+              newW = Math.max(200, Math.round(newH * aspectRatio));
+            }
+          }
+        }
+        
+        // Adjust L-shape cut dimensions if container is resized
+        if (isLShape && newLShape) {
+          // Ensure cut dimensions don't exceed new container dimensions
+          newLShape.cutWidth = Math.min(newLShape.cutWidth, newW - 20);
+          newLShape.cutHeight = Math.min(newLShape.cutHeight, newH - 20);
+        }
       }
+      
       // Snap dimensions to grid if enabled globally
       try {
-        if ((window as any).__snapEnabled) {
+        if ((window as any).__snapEnabled && !dir.startsWith('cut-')) {
           newW = Math.max(200, Math.round(newW / GRID_SIZE) * GRID_SIZE);
           newH = Math.max(140, Math.round(newH / GRID_SIZE) * GRID_SIZE);
         }
       } catch {}
+      
       const setNodesFn = (window as any).__setDiagramNodes;
       if (typeof setNodesFn === 'function') {
-        setNodesFn((nds: any[]) => nds.map(n => n.id === id ? { ...n, draggable: false, data: { ...n.data, width: newW, height: newH }, style: { ...(n.style||{}), width: newW, height: newH } } : n));
+        setNodesFn((nds: any[]) => nds.map(n => n.id === id ? { 
+          ...n, 
+          draggable: false, 
+          data: { 
+            ...n.data, 
+            width: newW, 
+            height: newH,
+            lShape: newLShape 
+          }, 
+          style: { 
+            ...(n.style||{}), 
+            width: newW, 
+            height: newH 
+          } 
+        } : n));
       }
     };
-    const up = () => { window.removeEventListener('mousemove', move); window.removeEventListener('mouseup', up); document.body.classList.remove('resizing-container'); const setNodesFn = (window as any).__setDiagramNodes; if (typeof setNodesFn === 'function') setNodesFn((nds: any[]) => nds.map(n => n.id === id ? { ...n, draggable: undefined as any } : n)); };
-    window.addEventListener('mousemove', move); window.addEventListener('mouseup', up);
+    
+    const up = () => { 
+      window.removeEventListener('mousemove', move); 
+      window.removeEventListener('mouseup', up); 
+      document.body.classList.remove('resizing-container'); 
+      const setNodesFn = (window as any).__setDiagramNodes; 
+      if (typeof setNodesFn === 'function') {
+        setNodesFn((nds: any[]) => nds.map(n => n.id === id ? { ...n, draggable: undefined as any } : n)); 
+      }
+    };
+    
+    window.addEventListener('mousemove', move); 
+    window.addEventListener('mouseup', up);
   };
 
   const headerPos = (data?.headerPos || 'top') as 'top'|'left';
@@ -167,7 +237,21 @@ const ComponentNode = memo(({ id, data, selected, isConnectable }: ComponentNode
             <div className="fw-label" aria-hidden="true">{firewallLabel}</div>
           </div>
         )}
-  <div className={`rounded-2xl overflow-hidden relative ${selected ? 'container-sel' : ''}`} data-partitions={partitions} style={{ width: '100%', height: '100%', border: `1px solid ${borderColor}`, background: bg, paddingTop: headerPos==='top'?CONTAINER_HEADER_HEIGHT:0, paddingLeft: headerPos==='left'?CONTAINER_HEADER_HEIGHT:0 }}>
+        <ContainerShapeWrapper
+          width={width}
+          height={height}
+          borderColor={borderColor}
+          bg={bg}
+          shape={data?.shape || 'rectangle'}
+          lShape={data?.lShape}
+          selected={selected}
+          locked={locked}
+          isContainer={isContainer}
+          id={id}
+          partitions={partitions}
+          headerPos={headerPos}
+          onResize={startResize}
+        >
           {/* Optional background image overlay (fills best while preserving aspect) */}
           {bgImageUrl && (
             <div className="absolute inset-0 pointer-events-none" aria-hidden>
@@ -178,7 +262,17 @@ const ComponentNode = memo(({ id, data, selected, isConnectable }: ComponentNode
             </div>
           )}
           {headerPos==='top' && (
-          <div className="absolute top-0 left-0 right-0 flex items-center gap-3 px-3 py-2 bg-white/90 dark:bg-slate-900/70 backdrop-blur border-b" style={{ borderColor: borderColor, height: CONTAINER_HEADER_HEIGHT }}>
+          <div 
+            className="absolute top-0 left-0 right-0 flex items-center gap-3 px-3 py-2 bg-white/90 dark:bg-slate-900/70 backdrop-blur border-b" 
+            style={{ 
+              borderColor: borderColor, 
+              height: CONTAINER_HEADER_HEIGHT,
+              // Offset header if top-left corner is cut
+              marginLeft: (data?.shape === 'l-shape' && data?.lShape?.cutCorner === 'top-left') 
+                ? Math.min(data.lShape.cutWidth || 120, width - 20) 
+                : 0
+            }}
+          >
             {icon ? (
               <div className="h-8 w-8 rounded-xl bg-white/70 dark:bg-slate-800/70 border flex items-center justify-center overflow-hidden shadow-sm">
                 <img src={icon} alt="" className="max-h-7 max-w-7 object-contain" />
@@ -209,13 +303,18 @@ const ComponentNode = memo(({ id, data, selected, isConnectable }: ComponentNode
           </div>)}
           {/* Partition separators and badges */}
           {partitions > 1 && (
-            <div className="absolute inset-0 pointer-events-none" aria-hidden>
+            <div className="absolute pointer-events-none" aria-hidden style={{ 
+              top: headerPos === 'top' ? CONTAINER_HEADER_HEIGHT : 0,
+              left: headerPos === 'left' ? CONTAINER_HEADER_HEIGHT : 0,
+              right: 0,
+              bottom: 0
+            }}>
               {Array.from({ length: partitions - 1 }).map((_, i) => {
                 const innerW = width - (headerPos==='left'?CONTAINER_HEADER_HEIGHT:0);
                 const step = innerW / partitions;
-                const x = (headerPos==='left'?CONTAINER_HEADER_HEIGHT:0) + Math.round(step * (i + 1));
+                const x = Math.round(step * (i + 1));
                 return (
-                  <div key={`guide-${i}`} className="absolute" style={{ left: x, top: headerPos==='top'?CONTAINER_HEADER_HEIGHT:0, bottom: 0 }}>
+                  <div key={`guide-${i}`} className="absolute" style={{ left: x, top: 0, bottom: 0 }}>
                     <div className="absolute inset-0" style={{ borderLeft: `1px solid ${borderColor}`, opacity: 0.9 }} />
                   </div>
                 );
@@ -224,11 +323,11 @@ const ComponentNode = memo(({ id, data, selected, isConnectable }: ComponentNode
               {Array.from({ length: partitions }).map((_, i) => {
                 const innerW = width - (headerPos==='left'?CONTAINER_HEADER_HEIGHT:0);
                 const step = innerW / partitions;
-                const left = (headerPos==='left'?CONTAINER_HEADER_HEIGHT:0) + Math.round(step * i + step/2);
+                const left = Math.round(step * i + step/2);
                 const url = Array.isArray(data?.partitionIcons) ? data.partitionIcons[i] : undefined;
                 const txt = Array.isArray((data as any)?.partitionBadgeTexts) ? (data as any).partitionBadgeTexts[i] : undefined;
                 return (
-                  <div key={`badge-${i}`} className="absolute" style={{ left, top: headerPos==='top'?CONTAINER_HEADER_HEIGHT:10, transform:'translate(-50%, -50%)' }}>
+                  <div key={`badge-${i}`} className="absolute" style={{ left, top: 10, transform:'translate(-50%, -50%)' }}>
                     {(url || txt) ? (() => { const badgeBg = mixHex(baseBg, '#ffffff', 0.3); const badgeFg = autoTextColor(badgeBg); return (
                       <div className="max-w-[160px] rounded-xl shadow border overflow-hidden" style={{ borderColor: borderColor, background: badgeBg, backdropFilter:'saturate(1.1) blur(1px)' }}>
                         <div className="px-2 h-8 inline-flex items-center gap-1 whitespace-nowrap">
@@ -242,14 +341,7 @@ const ComponentNode = memo(({ id, data, selected, isConnectable }: ComponentNode
               })}
             </div>
           )}
-          {showHandles && (
-            <>
-              <div data-resize onMouseDownCapture={(e)=>startResize(e,'e')} className="absolute top-1/2 right-0 -translate-y-1/2 translate-x-1/2 cursor-ew-resize bg-blue-500 hover:bg-blue-600 border-2 border-white hover:border-blue-200 rounded-full shadow-lg hover:shadow-xl transition-all duration-150 z-10" style={{ width: handleSize, height: handleSize }} />
-              <div data-resize onMouseDownCapture={(e)=>startResize(e,'s')} className="absolute bottom-0 left-1/2 -translate-x-1/2 translate-y-1/2 cursor-ns-resize bg-blue-500 hover:bg-blue-600 border-2 border-white hover:border-blue-200 rounded-full shadow-lg hover:shadow-xl transition-all duration-150 z-10" style={{ width: handleSize, height: handleSize }} />
-              <div data-resize onMouseDownCapture={(e)=>startResize(e,'se')} className="absolute bottom-0 right-0 translate-x-1/3 translate-y-1/3 cursor-nwse-resize bg-blue-600 hover:bg-blue-700 border-2 border-white hover:border-blue-200 rounded-md shadow-lg hover:shadow-xl transition-all duration-150 z-10" style={{ width: handleSize+2, height: handleSize+2 }} />
-            </>
-          )}
-        </div>
+        </ContainerShapeWrapper>
       </div>
     );
   }

@@ -54,6 +54,13 @@ export interface ContainerNodeData {
   headerPos?: 'top' | 'left';
   locked?: boolean;
   isContainer?: true;
+  // Shape configuration for L-shaped containers
+  shape?: 'rectangle' | 'l-shape';
+  lShape?: {
+    cutCorner: 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right';
+    cutWidth: number; // width of the cut rectangle
+    cutHeight: number; // height of the cut rectangle
+  };
 }
 
 export interface NetworkNodeData {
@@ -68,6 +75,13 @@ export interface NetworkNodeData {
   partitions?: number; // number of vertical partitions (default 1)
   partitionIcons?: string[]; // per-partition badge icons (length = partitions)
   partitionBadgeTexts?: string[]; // per-partition text labels shown next to the icon
+  // Shape configuration for L-shaped containers
+  shape?: 'rectangle' | 'l-shape';
+  lShape?: {
+    cutCorner: 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right';
+    cutWidth: number; // width of the cut rectangle
+    cutHeight: number; // height of the cut rectangle
+  };
 }
 
 export interface DoorNodeData extends BaseNodeData {

@@ -1,0 +1,118 @@
+/* Styles additionnels pour les formes L */
+
+/* Animation pour les handles de redimensionnement des formes L */
+.lshape-handle {
+  transition: all 0.2s ease;
+  border-radius: 3px;
+}
+
+.lshape-handle:hover {
+  transform: scale(1.1);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+
+/* Indication visuelle pour les zones coupées */
+.lshape-cut-area {
+  position: absolute;
+  background: repeating-linear-gradient(
+    45deg,
+    transparent,
+    transparent 4px,
+    rgba(255, 0, 0, 0.1) 4px,
+    rgba(255, 0, 0, 0.1) 8px
+  );
+  pointer-events: none;
+  border: 1px dashed rgba(255, 0, 0, 0.3);
+  border-radius: 4px;
+}
+
+/* Amélioration de l'affichage des handles spéciaux */
+[data-resize]:hover {
+  z-index: 20 !important;
+}
+
+/* Animation pour les transitions de forme */
+.shape-transition {
+  transition: clip-path 0.3s ease-in-out;
+}
+
+/* Styles pour les presets de forme L */
+.lshape-preset-button {
+  position: relative;
+  overflow: hidden;
+}
+
+.lshape-preset-button::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(135deg, transparent 70%, currentColor 70%);
+  opacity: 0.1;
+  transition: opacity 0.2s ease;
+}
+
+.lshape-preset-button:hover::before {
+  opacity: 0.2;
+}
+
+/* Indicateurs visuels pour les corners */
+.corner-indicator {
+  position: relative;
+  display: inline-block;
+  width: 24px;
+  height: 24px;
+}
+
+.corner-indicator::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  border: 2px solid currentColor;
+  border-radius: 2px;
+}
+
+.corner-indicator.top-left::after {
+  content: '';
+  position: absolute;
+  top: -2px;
+  left: -2px;
+  width: 10px;
+  height: 10px;
+  background: currentColor;
+}
+
+.corner-indicator.top-right::after {
+  content: '';
+  position: absolute;
+  top: -2px;
+  right: -2px;
+  width: 10px;
+  height: 10px;
+  background: currentColor;
+}
+
+.corner-indicator.bottom-left::after {
+  content: '';
+  position: absolute;
+  bottom: -2px;
+  left: -2px;
+  width: 10px;
+  height: 10px;
+  background: currentColor;
+}
+
+.corner-indicator.bottom-right::after {
+  content: '';
+  position: absolute;
+  bottom: -2px;
+  right: -2px;
+  width: 10px;
+  height: 10px;
+  background: currentColor;
+}

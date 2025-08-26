@@ -27,7 +27,9 @@ import {
   Target,
   Layers,
   Zap,
-  Globe
+  Globe,
+  Square,
+  Minus
 } from 'lucide-react';
 import { CATALOG } from '@/lib/catalog';
 import { autoTextColor } from '@/lib/utils';
@@ -37,6 +39,7 @@ import { AutoLayoutControls } from './AutoLayoutControls';
 import { AutoLayoutConfig } from '@/types/diagram';
 import { useStableInput } from './hooks/useStableInput';
 import { useInstanceGroups } from '@/contexts/InstanceGroupsContext';
+import { getDefaultLShapeConfig } from './utils/lshape-utils';
 
 const DEFAULT_AUTO_LAYOUT: AutoLayoutConfig = {
   enabled: false,
@@ -1062,6 +1065,204 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
                       <div className="text-xs text-slate-500">Ratio: {currentRatio.toFixed(4)}</div>
                     )}
                   </div>
+                </div>
+              </CollapsibleSection>
+            )}
+
+            {/* Section Forme pour conteneurs et réseaux */}
+            {(isContainer || isNetwork) && (
+              <CollapsibleSection title="Forme" icon={<Square className="h-3.5 w-3.5" />}>
+                <div className="space-y-3">
+                  {/* Sélecteur de forme */}
+                  <div className="space-y-2">
+                    <Label className="text-xs text-slate-600 dark:text-slate-400">Type de forme</Label>
+                    <div className="grid grid-cols-2 gap-2">
+                      <button
+                        type="button"
+                        onClick={() => onChange({ data: { shape: 'rectangle', lShape: undefined } })}
+                        className={`h-16 rounded-lg border-2 transition-all flex flex-col items-center justify-center gap-1 ${
+                          (selection.data.shape || 'rectangle') === 'rectangle'
+                            ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/30'
+                            : 'border-slate-200 dark:border-slate-600 hover:border-slate-300'
+                        }`}
+                      >
+                        <Square className="h-6 w-6" />
+                        <span className="text-xs">Rectangle</span>
+                      </button>
+                      
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const defaultLShape = selection.data.lShape || getDefaultLShapeConfig();
+                          onChange({ data: { shape: 'l-shape', lShape: defaultLShape } });
+                        }}
+                        className={`h-16 rounded-lg border-2 transition-all flex flex-col items-center justify-center gap-1 ${
+                          selection.data.shape === 'l-shape'
+                            ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/30'
+                            : 'border-slate-200 dark:border-slate-600 hover:border-slate-300'
+                        }`}
+                      >
+                        <div className="relative">
+                          <Square className="h-6 w-6" />
+                          <Minus className="h-2 w-2 absolute -top-0.5 -right-0.5 bg-white dark:bg-slate-800 rounded" />
+                        </div>
+                        <span className="text-xs">Forme L</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Configuration forme L */}
+                  {selection.data.shape === 'l-shape' && (
+                    <div className="space-y-3 p-3 rounded-lg border bg-slate-50/50 dark:bg-slate-700/30">
+                      <Label className="text-xs font-medium text-slate-700 dark:text-slate-300">Configuration forme L</Label>
+                      
+                      {/* Sélection du coin coupé */}
+                      <div className="space-y-2">
+                        <Label className="text-xs text-slate-600 dark:text-slate-400">Coin amputé</Label>
+                        <div className="grid grid-cols-2 gap-2">
+                          {[
+                            { value: 'top-left', label: 'Haut gauche', icon: '◤' },
+                            { value: 'top-right', label: 'Haut droit', icon: '◥' },
+                            { value: 'bottom-left', label: 'Bas gauche', icon: '◣' },
+                            { value: 'bottom-right', label: 'Bas droit', icon: '◢' },
+                          ].map(corner => {
+                            const isActive = (selection.data.lShape?.cutCorner || 'top-right') === corner.value;
+                            return (
+                              <button
+                                key={corner.value}
+                                type="button"
+                                onClick={() => {
+                                  const currentLShape = selection.data.lShape || getDefaultLShapeConfig();
+                                  onChange({ 
+                                    data: { 
+                                      lShape: { 
+                                        ...currentLShape, 
+                                        cutCorner: corner.value as any 
+                                      } 
+                                    } 
+                                  });
+                                }}
+                                className={`h-12 rounded-lg border transition-all flex flex-col items-center justify-center gap-1 text-xs ${
+                                  isActive
+                                    ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300'
+                                    : 'border-slate-200 dark:border-slate-600 hover:border-slate-300'
+                                }`}
+                              >
+                                <span className="text-lg">{corner.icon}</span>
+                                <span>{corner.label}</span>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+
+                      {/* Dimensions du coin coupé */}
+                      <div className="space-y-2">
+                        <Label className="text-xs text-slate-600 dark:text-slate-400">Dimensions du coin amputé</Label>
+                        <div className="grid grid-cols-2 gap-2">
+                          <div className="space-y-1">
+                            <Label className="text-xs text-slate-500">Largeur</Label>
+                            <Input
+                              type="number"
+                              className="h-8"
+                              min={20}
+                              max={Math.max(20, (selection.data.width || 520) - 20)}
+                              value={selection.data.lShape?.cutWidth || 120}
+                              onChange={(e) => {
+                                const currentLShape = selection.data.lShape || getDefaultLShapeConfig();
+                                const value = Math.max(20, Math.min(
+                                  (selection.data.width || 520) - 20,
+                                  parseInt(e.target.value) || 120
+                                ));
+                                onChange({ 
+                                  data: { 
+                                    lShape: { 
+                                      ...currentLShape, 
+                                      cutWidth: value 
+                                    } 
+                                  } 
+                                });
+                              }}
+                            />
+                          </div>
+                          <div className="space-y-1">
+                            <Label className="text-xs text-slate-500">Hauteur</Label>
+                            <Input
+                              type="number"
+                              className="h-8"
+                              min={20}
+                              max={Math.max(20, (selection.data.height || 320) - 20)}
+                              value={selection.data.lShape?.cutHeight || 80}
+                              onChange={(e) => {
+                                const currentLShape = selection.data.lShape || getDefaultLShapeConfig();
+                                const value = Math.max(20, Math.min(
+                                  (selection.data.height || 320) - 20,
+                                  parseInt(e.target.value) || 80
+                                ));
+                                onChange({ 
+                                  data: { 
+                                    lShape: { 
+                                      ...currentLShape, 
+                                      cutHeight: value 
+                                    } 
+                                  } 
+                                });
+                              }}
+                            />
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Presets rapides */}
+                      <div className="space-y-2">
+                        <Label className="text-xs text-slate-600 dark:text-slate-400">Presets rapides</Label>
+                        <div className="flex gap-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="h-7 text-xs flex-1"
+                            onClick={() => {
+                              const currentLShape = selection.data.lShape || getDefaultLShapeConfig();
+                              const width = selection.data.width || 520;
+                              const height = selection.data.height || 320;
+                              onChange({ 
+                                data: { 
+                                  lShape: { 
+                                    ...currentLShape, 
+                                    cutWidth: Math.round(width * 0.25),
+                                    cutHeight: Math.round(height * 0.25)
+                                  } 
+                                } 
+                              });
+                            }}
+                          >
+                            Petit
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="h-7 text-xs flex-1"
+                            onClick={() => {
+                              const currentLShape = selection.data.lShape || getDefaultLShapeConfig();
+                              const width = selection.data.width || 520;
+                              const height = selection.data.height || 320;
+                              onChange({ 
+                                data: { 
+                                  lShape: { 
+                                    ...currentLShape, 
+                                    cutWidth: Math.round(width * 0.4),
+                                    cutHeight: Math.round(height * 0.4)
+                                  } 
+                                } 
+                              });
+                            }}
+                          >
+                            Grand
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </CollapsibleSection>
             )}

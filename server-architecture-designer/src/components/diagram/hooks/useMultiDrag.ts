@@ -1,4 +1,5 @@
 import { useCallback, useRef } from 'react';
+import { useLShapeCollision } from './useLShapeCollision';
 
 type MultiDragDeps = {
   nodes: any[];
@@ -23,6 +24,8 @@ export function useMultiDrag({ nodes, setNodes, mode, MODES, DEFAULT_DOOR_WIDTH,
     partitionWidth?: number;
     containerWidth?: number;
   } | null>(null);
+
+  const { checkNodeCollisionWithLShape } = useLShapeCollision();
 
   const onNodeDragStartMulti = useCallback((_: any, node: any) => {
     if (!node) return;
@@ -102,9 +105,20 @@ export function useMultiDrag({ nodes, setNodes, mode, MODES, DEFAULT_DOOR_WIDTH,
         const right = (ref.headerLeft || 0) + (idx + 1) * (ref.partitionWidth || 1);
         newX = Math.max(left + pad, Math.min(newX, right - nodeW - pad));
       }
+      
+      // Check L-shape collision if node has a parent container
+      if (n.parentNode && n.type !== 'door') {
+        const parent = nds.find((p: any) => p.id === n.parentNode);
+        if (parent) {
+          const adjustedPosition = checkNodeCollisionWithLShape(n, parent, { x: newX, y: newY });
+          newX = adjustedPosition.x;
+          newY = adjustedPosition.y;
+        }
+      }
+      
       return { ...n, position: { x: newX, y: newY }, data: { ...(n as any).data, parentPartition: ref.partIndex?.[n.id] ?? (n as any).data?.parentPartition } } as any;
     }));
-  }, [setNodes, mode, MODES, DEFAULT_DOOR_WIDTH, DEFAULT_DOOR_HEIGHT, snapDoorToNearestSide]);
+  }, [setNodes, mode, MODES, DEFAULT_DOOR_WIDTH, DEFAULT_DOOR_HEIGHT, snapDoorToNearestSide, checkNodeCollisionWithLShape]);
 
   const onNodeDragStopMulti = useCallback(() => { dragBundleRef.current = null; }, []);
 
