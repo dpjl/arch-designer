@@ -573,6 +573,73 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
                   />
                 </div>
               )}
+
+              {/* Image d'arrière-plan pour les conteneurs */}
+              {isContainer && (
+                <div className="space-y-2">
+                  <Label className="text-xs text-slate-600 dark:text-slate-400">Image d'arrière-plan</Label>
+                  <Input 
+                    className="h-8 text-xs" 
+                    placeholder="URL de l'image d'arrière-plan..." 
+                    value={selection.data.bgImageUrl || ''} 
+                    onChange={(e) => onChange({ data: { bgImageUrl: e.target.value } })} 
+                  />
+                  
+                  {selection.data.bgImageUrl && (
+                    <div className="space-y-2">
+                      {/* Prévisualisation de l'image */}
+                      <div className="p-2 rounded-lg border bg-slate-50/50 dark:bg-slate-700/30">
+                        <div className="flex items-center gap-2 mb-2">
+                          <Image className="h-3.5 w-3.5 text-slate-500" />
+                          <span className="text-xs text-slate-600 dark:text-slate-400">Aperçu</span>
+                          <button 
+                            type="button" 
+                            onClick={() => onChange({ data: { bgImageUrl: '' } })} 
+                            className="ml-auto h-6 w-6 rounded-md border text-xs hover:bg-slate-100 dark:hover:bg-slate-600 flex items-center justify-center"
+                            title="Supprimer l'image"
+                          >
+                            ✕
+                          </button>
+                        </div>
+                        <div className="relative h-16 w-full rounded-md border overflow-hidden bg-white dark:bg-slate-800">
+                          <img 
+                            src={selection.data.bgImageUrl} 
+                            alt="Aperçu" 
+                            className="absolute inset-0 w-full h-full object-contain"
+                            style={{ opacity: selection.data.bgImageOpacity ?? 0.3 }}
+                            onError={(e) => {
+                              e.currentTarget.style.display = 'none';
+                              const nextEl = e.currentTarget.nextElementSibling as HTMLElement | null;
+                              if (nextEl) {
+                                nextEl.style.display = 'flex';
+                              }
+                            }}
+                          />
+                          <div className="absolute inset-0 hidden items-center justify-center text-xs text-slate-500">
+                            Image non trouvée
+                          </div>
+                        </div>
+                      </div>
+                      
+                      {/* Opacité de l'image d'arrière-plan */}
+                      <div className="space-y-1">
+                        <Label className="text-xs text-slate-600 dark:text-slate-400">
+                          Opacité image {Math.round((selection.data.bgImageOpacity ?? 0.3)*100)}%
+                        </Label>
+                        <input 
+                          type="range" 
+                          min={0.05} 
+                          max={1} 
+                          step={0.05} 
+                          value={selection.data.bgImageOpacity ?? 0.3} 
+                          onChange={(e) => onChange({ data: { bgImageOpacity: parseFloat(e.target.value) } })} 
+                          className="w-full accent-blue-500" 
+                        />
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
             </CollapsibleSection>
 
             {/* Section Fonctionnalités pour les services et conteneurs */}
