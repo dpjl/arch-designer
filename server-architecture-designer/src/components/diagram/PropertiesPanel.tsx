@@ -575,8 +575,8 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
               )}
             </CollapsibleSection>
 
-            {/* Section Fonctionnalités pour les services */}
-            {isService && (
+            {/* Section Fonctionnalités pour les services et conteneurs */}
+            {(isService || isContainer) && (
               <CollapsibleSection title="Fonctionnalités" icon={<Shield className="h-3.5 w-3.5" />}>
                 <div className="grid grid-cols-4 gap-2">
                   <IconToggleButton
@@ -607,14 +607,41 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
                 </div>
                 
                 {selection.data.features?.firewall && (
-                  <div className="space-y-1">
-                    <Label className="text-xs text-slate-600 dark:text-slate-400">Texte Firewall</Label>
-                    <Input
-                      className="h-8 text-xs"
-                      placeholder="FIREWALL"
-                      value={selection.data.features?.firewallLabel || ''}
-                      onChange={(e) => onChange({ data: { features: { ...(selection.data.features||{}), firewallLabel: e.target.value } } })}
-                    />
+                  <div className="space-y-2">
+                    <div className="space-y-1">
+                      <Label className="text-xs text-slate-600 dark:text-slate-400">Texte Firewall</Label>
+                      <Input
+                        className="h-8 text-xs"
+                        placeholder="FIREWALL"
+                        value={selection.data.features?.firewallLabel || ''}
+                        onChange={(e) => onChange({ data: { features: { ...(selection.data.features||{}), firewallLabel: e.target.value } } })}
+                      />
+                    </div>
+                    
+                    <div className="space-y-1">
+                      <Label className="text-xs text-slate-600 dark:text-slate-400">Variant Firewall</Label>
+                      <div className="grid grid-cols-3 gap-1">
+                        {[
+                          { id: 'default', label: 'Normal', color: 'text-green-600' },
+                          { id: 'secure', label: 'Sécurisé', color: 'text-blue-600' },
+                          { id: 'warning', label: 'Alerte', color: 'text-red-600' }
+                        ].map(variant => {
+                          const active = (selection.data.features?.firewallVariant || 'default') === variant.id;
+                          return (
+                            <button
+                              key={variant.id}
+                              type="button"
+                              onClick={() => onChange({ data: { features: { ...(selection.data.features||{}), firewallVariant: variant.id } } })}
+                              className={`px-2 h-8 rounded-lg border text-xs transition-colors ${
+                                active ? 'bg-blue-50 border-blue-500 text-blue-600' : 'bg-white border-slate-200 hover:bg-slate-50'
+                              }`}
+                            >
+                              <span className={active ? 'font-medium' : variant.color}>{variant.label}</span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
                   </div>
                 )}
               </CollapsibleSection>

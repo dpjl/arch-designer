@@ -98,6 +98,7 @@ const ComponentNode = memo(({ id, data, selected, isConnectable }: ComponentNode
   const labelFg = autoTextColor(baseBg || '#ffffff');
   const handleSize = 16;
   const showHandles = isContainer && selected && !locked;
+  const { theme } = useTheme();
   const firewallLabel = String((data?.features?.firewallLabel ?? 'FIREWALL') || 'FIREWALL');
   const firewallVariant = data?.features?.firewallVariant || 'default'; // 'default', 'secure', 'warning'
 
@@ -221,14 +222,24 @@ const ComponentNode = memo(({ id, data, selected, isConnectable }: ComponentNode
   const partitions = Math.max(1, Math.min(12, parseInt(String(data?.partitions ?? 1), 10) || 1));
   if (isContainer) {
     const tex = getBrickTexture();
+    const isDark = theme === 'dark';
+    const texUrlH = isDark && tex.urlHDark ? tex.urlHDark : tex.urlH;
+    
     return (
-      <div className="relative" style={{ width, height, ['--fwtexH' as any]: features?.firewall ? `url('${tex.urlH}')` : undefined, ['--fwtexV' as any]: features?.firewall ? `url('${tex.urlV}')` : undefined, ['--fwtexSize' as any]: features?.firewall ? `${tex.size}px ${tex.size}px` : undefined, ['--fwtexOffX' as any]: `${tex.offX}px`, ['--fwtexOffY' as any]: `${tex.offY}px`, ['--fwShiftTopY' as any]: `${tex.shiftTopY}px`, ['--fwShiftSideX' as any]: `${tex.shiftSideX}px`, ['--ringGapInner' as any]: '8px', ['--ringThickness' as any]: '14px' }}>
+      <div className="relative" style={{ 
+        width, height, 
+        ['--fwtexH' as any]: features?.firewall ? `url('${texUrlH}')` : undefined, 
+        ['--fwtexSize' as any]: features?.firewall ? `${tex.size}px ${tex.size}px` : undefined, 
+        ['--fwtexOffX' as any]: `${tex.offX}px`, 
+        ['--fwtexOffY' as any]: `${tex.offY}px`, 
+        ['--fwShiftTopY' as any]: `${tex.shiftTopY}px`, 
+        ['--fwShiftSideX' as any]: `${tex.shiftSideX}px`, 
+        ['--ringGapInner' as any]: '8px', 
+        ['--ringThickness' as any]: '14px' 
+      }}>
         {features?.firewall && (
           <div className="firewall-ring rounded-2xl">
             <div className="fw-top" />
-            <div className="fw-bottom" />
-            <div className="fw-left" />
-            <div className="fw-right" />
             <div className="fw-badge fw-badge--rect" title="Firewall activé" aria-label="firewall">
               <div className="fw-rect">
                 <FirewallIcon size={24} variant={firewallVariant as any} />
@@ -347,6 +358,8 @@ const ComponentNode = memo(({ id, data, selected, isConnectable }: ComponentNode
   }
 
   const tex = getBrickTexture();
+  const texUrlH = isDark && tex.urlHDark ? tex.urlHDark : tex.urlH;
+  
   // Service node width computation (applies to the service card only)
   let serviceWidth: number | undefined;
   if (widthMode === 'fixed') {
@@ -373,13 +386,19 @@ const ComponentNode = memo(({ id, data, selected, isConnectable }: ComponentNode
   }, [widthMode, label, features, icon, borderColor, customWidth]);
 
   return (
-    <div className="relative inline-block" style={{ ['--fwtexH' as any]: features?.firewall ? `url('${tex.urlH}')` : undefined, ['--fwtexV' as any]: features?.firewall ? `url('${tex.urlV}')` : undefined, ['--fwtexSize' as any]: features?.firewall ? `${tex.size}px ${tex.size}px` : undefined, ['--fwtexOffX' as any]: `${tex.offX}px`, ['--fwtexOffY' as any]: `${tex.offY}px`, ['--fwShiftTopY' as any]: `${tex.shiftTopY}px`, ['--fwShiftSideX' as any]: `${tex.shiftSideX}px`, ['--ringGapInner' as any]: '5px', ['--ringThickness' as any]: '12px' }}>
+    <div className="relative inline-block" style={{ 
+      ['--fwtexH' as any]: features?.firewall ? `url('${texUrlH}')` : undefined, 
+      ['--fwtexSize' as any]: features?.firewall ? `${tex.size}px ${tex.size}px` : undefined, 
+      ['--fwtexOffX' as any]: `${tex.offX}px`, 
+      ['--fwtexOffY' as any]: `${tex.offY}px`, 
+      ['--fwShiftTopY' as any]: `${tex.shiftTopY}px`, 
+      ['--fwShiftSideX' as any]: `${tex.shiftSideX}px`, 
+      ['--ringGapInner' as any]: '5px', 
+      ['--ringThickness' as any]: '12px' 
+    }}>
         {features?.firewall && (
           <div className="firewall-ring rounded-2xl">
             <div className="fw-top" />
-            <div className="fw-bottom" />
-            <div className="fw-left" />
-            <div className="fw-right" />
             <div className="fw-badge fw-badge--rect" title="Firewall activé" aria-label="firewall">
               <div className="fw-rect">
                 <FirewallIcon size={24} variant={firewallVariant as any} />

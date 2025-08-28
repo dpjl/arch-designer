@@ -238,10 +238,66 @@
 .custom-edge .anchor-handle:hover { transform: scale(1.1); }
 .custom-edge .anchor-handle.dragging { cursor: grabbing; transform: scale(1.2); }
 
-/* Firewall ring styles (shared across nodes). Uses CSS variables set inline for textures and offsets. */
-.firewall-ring { position:absolute; inset:-8px; border-radius:1.35rem; pointer-events:none; z-index:1; }
-.firewall-ring .fw-top, .firewall-ring .fw-bottom, .firewall-ring .fw-left, .firewall-ring .fw-right {
-  position:absolute; background-repeat:repeat; background-size: var(--fwtexSize, 16px 16px);
+/* Firewall ring styles - Affichage moderne avec bordure supérieure uniquement */
+.firewall-ring { 
+  position: absolute; 
+  inset: -8px; 
+  border-radius: 1.35rem; 
+  pointer-events: none; 
+  z-index: 1;
+  
+  /* Animation subtile pour indiquer l'activité */
+  animation: firewallGlow 4s ease-in-out infinite;
+}
+
+@keyframes firewallGlow {
+  0%, 100% { 
+    filter: brightness(1) saturate(1);
+  }
+  50% { 
+    filter: brightness(1.05) saturate(1.1);
+  }
+}
+
+/* Style pour la bordure supérieure uniquement - plus discret et moderne */
+.firewall-ring .fw-top {
+  position: absolute; 
+  background-repeat: repeat; 
+  background-size: var(--fwtexSize, 16px 16px);
+  
+  /* Amélioration visuelle avec ombres et effets */
+  box-shadow: 
+    inset 0 1px 0 rgba(255, 255, 255, 0.15),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.1),
+    0 2px 6px rgba(0, 0, 0, 0.2);
+  
+  /* Transition pour les changements de thème */
+  transition: all .3s ease;
+  
+  /* Positionnement et style spécifique pour la bordure supérieure */
+  top: calc(var(--ringGapInner, 2px) * -1); 
+  left: 0; 
+  right: 0; 
+  height: var(--ringThickness, 8px); 
+  border-top-left-radius: 1.35rem; 
+  border-top-right-radius: 1.35rem; 
+  background-image: var(--fwtexH); 
+  background-position: var(--fwtexOffX, 0) calc(var(--fwShiftTopY, 0));
+}
+
+/* Effets spéciaux pour le mode sombre - bordure supérieure uniquement */
+.dark .firewall-ring .fw-top {
+  box-shadow: 
+    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.25),
+    0 2px 6px rgba(0, 0, 0, 0.4);
+}
+
+/* Masquer les autres bordures - on ne garde que le haut */
+.firewall-ring .fw-bottom,
+.firewall-ring .fw-left,
+.firewall-ring .fw-right {
+  display: none;
 }
 
 /* Badge firewall moderne et professionnel */
@@ -383,9 +439,4 @@
     transform: scale(0.9);
   }
 }
-
-.firewall-ring .fw-top { top: calc(var(--ringGapInner, 2px) * -1); left:0; right:0; height: var(--ringThickness, 8px); border-top-left-radius:1.35rem; border-top-right-radius:1.35rem; background-image: var(--fwtexH); background-position: var(--fwtexOffX, 0) calc(var(--fwShiftTopY, 0)); }
-.firewall-ring .fw-bottom { bottom: calc(var(--ringGapInner, 2px) * -1); left:0; right:0; height: var(--ringThickness, 8px); border-bottom-left-radius:1.35rem; border-bottom-right-radius:1.35rem; background-image: var(--fwtexH); background-position: var(--fwtexOffX, 0) calc(var(--fwShiftTopY, 0)); }
-.firewall-ring .fw-left { top:0; bottom:0; left: calc(var(--ringGapInner, 2px) * -1); width: var(--ringThickness, 8px); border-top-left-radius:1.35rem; border-bottom-left-radius:1.35rem; background-image: var(--fwtexV); background-position: calc(var(--fwShiftSideX, 0)) var(--fwtexOffX, 0); }
-.firewall-ring .fw-right { top:0; bottom:0; right: calc(var(--ringGapInner, 2px) * -1); width: var(--ringThickness, 8px); border-top-right-radius:1.35rem; border-bottom-right-radius:1.35rem; background-image: var(--fwtexV); background-position: calc(var(--fwShiftSideX, 0)) var(--fwtexOffX, 0); }
 
