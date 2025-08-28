@@ -61,7 +61,7 @@ export const ContainerShapeWrapper: React.FC<ContainerShapeWrapperProps> = ({
         />
       )}
       
-    <div 
+  <div 
         className={`rounded-2xl overflow-hidden relative ${selected ? 'container-sel' : ''}`} 
         data-partitions={partitions}
     data-shape={shape}

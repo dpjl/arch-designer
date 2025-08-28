@@ -42,7 +42,7 @@ export const NetworkShapeWrapper: React.FC<NetworkShapeWrapperProps> = ({
     : 'none';
 
   return (
-    <div className="relative w-full h-full pointer-events-none">
+  <div className="relative w-full h-full pointer-events-none">
       {/* Internal borders for L-shape - outside the clipped container */}
       {shape === 'l-shape' && lShape && (
         <LShapeInternalBorders
@@ -53,7 +53,7 @@ export const NetworkShapeWrapper: React.FC<NetworkShapeWrapperProps> = ({
         />
       )}
       
-      <div 
+  <div 
         className="rounded-2xl relative border shadow-sm overflow-visible" 
         data-partitions={partitions}
         style={{ 
