@@ -10,6 +10,7 @@ import { getBrickTexture } from '../firewall-texture';
 import { FirewallIcon } from '../icons/FirewallIcon';
 import { effectiveBorderColor, effectiveBgColor, isAuto } from '../color-utils';
 import { ContainerShapeWrapper } from '../utils/ContainerShapeWrapper';
+import { generateLShapeClipPath } from '../utils/lshape-utils';
 
 // getBrickTexture now provided by shared utility
 
@@ -238,7 +239,7 @@ const ComponentNode = memo(({ id, data, selected, isConnectable }: ComponentNode
         ['--ringThickness' as any]: '14px' 
       }}>
         {features?.firewall && (
-          <div className="firewall-ring rounded-2xl">
+          <div className="firewall-ring rounded-2xl" style={{ pointerEvents: 'none' }}>
             <div className="fw-top" />
             <div className="fw-badge fw-badge--rect" title="Firewall activé" aria-label="firewall">
               <div className="fw-rect">
@@ -248,7 +249,7 @@ const ComponentNode = memo(({ id, data, selected, isConnectable }: ComponentNode
             <div className="fw-label" aria-hidden="true">{firewallLabel}</div>
           </div>
         )}
-        <ContainerShapeWrapper
+  <ContainerShapeWrapper
           width={width}
           height={height}
           borderColor={borderColor}

@@ -50,7 +50,7 @@ export const ContainerShapeWrapper: React.FC<ContainerShapeWrapperProps> = ({
   const CONTAINER_HEADER_HEIGHT = 52; // Match the constant from ComponentNode
 
   return (
-    <div className="relative w-full h-full">
+  <div className="relative w-full h-full pointer-events-none">
       {/* Internal borders for L-shape - outside the clipped container */}
       {shape === 'l-shape' && lShape && (
         <LShapeInternalBorders
@@ -61,19 +61,22 @@ export const ContainerShapeWrapper: React.FC<ContainerShapeWrapperProps> = ({
         />
       )}
       
-      <div 
+    <div 
         className={`rounded-2xl overflow-hidden relative ${selected ? 'container-sel' : ''}`} 
         data-partitions={partitions}
+    data-shape={shape}
+    data-cut-corner={lShape?.cutCorner}
         style={{ 
           width: '100%', 
           height: '100%', 
           border: `1px solid ${borderColor}`, 
           background: bg,
           clipPath: clipPath,
+      pointerEvents: 'auto',
           paddingTop: headerPos === 'top' ? CONTAINER_HEADER_HEIGHT : 0,
           paddingLeft: headerPos === 'left' ? CONTAINER_HEADER_HEIGHT : 0
         }}
-      >
+  >
         {children}
         
         {showHandles && onResize && (

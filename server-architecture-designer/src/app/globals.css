@@ -198,6 +198,32 @@
 @keyframes edge-dash { to { stroke-dashoffset:-12; } }
 .container-sel:after { content:""; position:absolute; inset:0; border:2px dashed #3b82f6; border-radius:1rem; pointer-events:none; }
 
+/* RF L-shape hit-testing: let the wrapper ignore events except on the visible L area */
+.react-flow__node.rf-lshape {
+  pointer-events: none;
+}
+.react-flow__node.rf-lshape::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: auto; /* only this overlay receives events */
+  background: transparent; /* invisible overlay for hit-testing */
+}
+
+/* Clip the overlay to the visible L area using CSS variables --cut-w and --cut-h (percentages) */
+.react-flow__node.rf-lshape.rf-lshape--tl::before {
+  clip-path: polygon(var(--cut-w, 20%) 0%, 100% 0%, 100% 100%, 0% 100%, 0% var(--cut-h, 20%), var(--cut-w, 20%) var(--cut-h, 20%));
+}
+.react-flow__node.rf-lshape.rf-lshape--tr::before {
+  clip-path: polygon(0% 0%, calc(100% - var(--cut-w, 20%)) 0%, calc(100% - var(--cut-w, 20%)) var(--cut-h, 20%), 100% var(--cut-h, 20%), 100% 100%, 0% 100%);
+}
+.react-flow__node.rf-lshape.rf-lshape--bl::before {
+  clip-path: polygon(0% 0%, 100% 0%, 100% 100%, var(--cut-w, 20%) 100%, var(--cut-w, 20%) calc(100% - var(--cut-h, 20%)), 0% calc(100% - var(--cut-h, 20%)));
+}
+.react-flow__node.rf-lshape.rf-lshape--br::before {
+  clip-path: polygon(0% 0%, 100% 0%, 100% calc(100% - var(--cut-h, 20%)), calc(100% - var(--cut-w, 20%)) calc(100% - var(--cut-h, 20%)), calc(100% - var(--cut-w, 20%)) 100%, 0% 100%);
+}
+
 /* Elevate edges above nodes */
 .react-flow__edges { z-index: 50 !important; }
 .react-flow__nodes { z-index: 10 !important; }

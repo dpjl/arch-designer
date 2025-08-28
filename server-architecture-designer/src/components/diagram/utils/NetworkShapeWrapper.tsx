@@ -42,7 +42,7 @@ export const NetworkShapeWrapper: React.FC<NetworkShapeWrapperProps> = ({
     : 'none';
 
   return (
-    <div className="relative w-full h-full">
+    <div className="relative w-full h-full pointer-events-none">
       {/* Internal borders for L-shape - outside the clipped container */}
       {shape === 'l-shape' && lShape && (
         <LShapeInternalBorders
@@ -60,7 +60,8 @@ export const NetworkShapeWrapper: React.FC<NetworkShapeWrapperProps> = ({
           borderColor, 
           width: '100%', 
           height: '100%',
-          clipPath: clipPath
+          clipPath: clipPath,
+          pointerEvents: 'auto'
         }}
       >
         {/* Background with tint */}

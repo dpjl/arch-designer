@@ -55,6 +55,9 @@ import { exportViewportCropToPng, exportFullDiagram, fitAndExportSelection } fro
 import { printDataUrl } from '@/lib/export/print';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { Input } from "@/components/ui/input";
+import { isPointInLShape } from './diagram/utils/lshape-utils';
+import { useLShapeDomClip } from './diagram/hooks/useLShapeDomClip';
+import { findLAwareContainerAt, pickUnderlyingNode } from './diagram/utils/lshape-hit';
 // PaletteItem moved into PalettePanel
 // function PaletteItem({ entry, onDragStart }: any) {
 //   return (
@@ -397,6 +400,8 @@ function DiagramCanvas({
   
   // Track changes
   useEffect(()=>{ commitIfChanged(nodes, edges); }, [nodes, edges, commitIfChanged]);
+  // Apply L-shape DOM clipping to wrappers
+  useLShapeDomClip(nodes);
   // One-time cleanup: remove any persisted node.draggable flags so global gating applies uniformly
   const cleanedDraggableRef = useRef(false);
   useEffect(() => {
@@ -562,30 +567,7 @@ function DiagramCanvas({
   }, []);
 
   // Container hit test — with self/descendant exclusion to prevent cycles
-  const findContainerAt = useCallback((absPos: { x: number; y: number }, excludeId?: string) => {
-    const candidates = nodes
-      .filter((n) => (n.data?.isContainer || n.type === 'network') && n.id !== excludeId)
-      .map((c) => {
-        const abs = absoluteOf(c);
-        const w = (c.type === 'network' ? (c.data?.width ?? 420) : (c.data?.width ?? c.style?.width ?? 520)) as number;
-        const h = (c.type === 'network' ? (c.data?.height ?? 240) : (c.data?.height ?? c.style?.height ?? 320)) as number;
-        return { c, rect: { x: abs.x, y: abs.y, w, h } };
-      })
-      .filter(({ c, rect }) => absPos.x >= rect.x && absPos.y >= rect.y && absPos.x <= rect.x + rect.w && absPos.y <= rect.y + rect.h)
-      .filter(({ c }) => !(excludeId && isAncestor(nodes, excludeId, c.id)));
-    if (!candidates.length) return null;
-    // Choose the smallest area container that contains the point (most inner visually)
-    candidates.sort((A, B) => {
-      const a = A.rect.w * A.rect.h;
-      const b = B.rect.w * B.rect.h;
-      if (a !== b) return a - b;
-      // tie-breaker: greater depth wins
-      const pmap = parentMapOf(nodes);
-      const depth = (id: string) => { let d=0, p=pmap.get(id) as string|undefined, g=0; while(p && g++<100){ d++; p = pmap.get(p); } return d; };
-      return depth(B.c.id) - depth(A.c.id);
-    });
-    return candidates[0].c;
-  }, [nodes, absoluteOf]);
+  const findContainerAt = useCallback((absPos: { x: number; y: number }, excludeId?: string) => findLAwareContainerAt(nodes, absoluteOf, absPos, excludeId), [nodes, absoluteOf]);
 
   // DnD handlers (extracted)
   const { onDrop, onDragOver, onNodeDragStop } = useMemo(() => createDnDHandlers({
@@ -604,7 +586,53 @@ function DiagramCanvas({
   }), [mode, project, nodes, setNodes, findContainerAt]);
 
   // Selection / connect
-  const onNodeClick = useCallback((evt: any, node: any) => onNodeClickInteraction(evt, node, selectNode), [onNodeClickInteraction, selectNode]);
+  const onNodeClick = useCallback((evt: any, node: any) => {
+    // If click occurs in the hollow corner of an L-shaped container, pick what's underneath instead
+    try {
+      if (node?.data?.isContainer && node?.data?.shape === 'l-shape' && node?.data?.lShape) {
+        // Compute click position relative to node top-left in scene coords
+        const viewport = (reactFlowWrapper.current?.querySelector('.react-flow__viewport') as HTMLElement) || null;
+        const svg = (viewport?.querySelector('svg') as SVGSVGElement) || null;
+        const ptX = (evt?.clientX as number) ?? 0; const ptY = (evt?.clientY as number) ?? 0;
+        // Project client -> RF scene using project() over wrapper bounds for robustness
+        const wrapper = reactFlowWrapper.current; if (wrapper) {
+          const bounds = wrapper.getBoundingClientRect();
+          const local = { x: ptX - bounds.left, y: ptY - bounds.top };
+          const absPos = project(local);
+          // Node absolute rect
+          const abs = absoluteOf(node);
+          const w = (node.data?.width || node.style?.width || node.width || 520) as number;
+          const h = (node.data?.height || node.style?.height || node.height || 320) as number;
+          const localX = absPos.x - abs.x; const localY = absPos.y - abs.y;
+          const insideVisible = isPointInLShape(localX, localY, w, h, node.data.lShape);
+      if (!insideVisible) {
+            // Click fell in the cutout: prevent selecting this node and try to find a deeper target
+            evt?.preventDefault?.(); evt?.stopPropagation?.();
+            // Temporarily ignore this node and search for another container under cursor
+            const underContainer = findContainerAt(absPos, node.id);
+            if (underContainer) {
+        onNodeClickInteraction(evt, underContainer, selectNode);
+        // Sync RF selection so handles move to the new target
+        setNodes((nds)=> nds.map(n=> n.id===underContainer.id ? { ...n, selected: true } : (n.selected ? { ...n, selected: false } : n)));
+              return;
+            }
+            // If no container, try to find a child or any node under cursor
+            const underNode = pickUnderlyingNode(nodes, absoluteOf, absPos, node.id);
+            if (underNode?.n) {
+              onNodeClickInteraction(evt, underNode, selectNode);
+              setNodes((nds)=> nds.map(n=> n.id===underNode.id ? { ...n, selected: true } : (n.selected ? { ...n, selected: false } : n)));
+              return;
+            }
+            // Nothing underneath: clear selection
+            setSelection(null);
+            setNodes((nds)=> nds.map(n=> n.selected ? { ...n, selected: false } : n));
+            return;
+          }
+        }
+      }
+    } catch {}
+    onNodeClickInteraction(evt, node, selectNode);
+  }, [onNodeClickInteraction, selectNode, nodes, project, absoluteOf, findContainerAt, setSelection]);
 
   const onEdgeClick = useCallback((_: any, edge: any) => { if (mode === MODES.EDIT) setSelection({ ...edge, type: "edge" }); }, [mode, setSelection]);
 

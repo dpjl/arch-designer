@@ -106,15 +106,7 @@ export function useMultiDrag({ nodes, setNodes, mode, MODES, DEFAULT_DOOR_WIDTH,
         newX = Math.max(left + pad, Math.min(newX, right - nodeW - pad));
       }
       
-      // Check L-shape collision if node has a parent container
-      if (n.parentNode && n.type !== 'door') {
-        const parent = nds.find((p: any) => p.id === n.parentNode);
-        if (parent) {
-          const adjustedPosition = checkNodeCollisionWithLShape(n, parent, { x: newX, y: newY });
-          newX = adjustedPosition.x;
-          newY = adjustedPosition.y;
-        }
-      }
+  // Do not clamp against L-shape cutout during drag; allow free movement.
       
       return { ...n, position: { x: newX, y: newY }, data: { ...(n as any).data, parentPartition: ref.partIndex?.[n.id] ?? (n as any).data?.parentPartition } } as any;
     }));

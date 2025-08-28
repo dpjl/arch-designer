@@ -108,16 +108,20 @@ export function getAvailableResizeHandles(lShape?: LShapeConfig): string[] {
   // Remove handles that would be in the cut-out area
   switch (cutCorner) {
     case 'top-left':
-      return ['e', 's', 'se', 'cut-w', 'cut-n']; // Add custom handles for cut area
+  // Top and left are cut: keep right & bottom edges, optional bottom-right corner.
+  return ['e', 's', 'se', 'cut-w', 'cut-n'];
     
     case 'top-right':
-      return ['e', 's', 'w', 'cut-e', 'cut-n'];
+  // Top and right are cut: keep left & bottom edges, plus right edge (visible below cut)
+  return ['e', 's', 'w', 'cut-e', 'cut-n'];
     
     case 'bottom-left':
-      return ['e', 's', 'se', 'n', 'cut-w', 'cut-s'];
+  // Bottom and left are cut: keep right & top edges; bottom edge visible right of cut
+  return ['e', 's', 'n', 'cut-w', 'cut-s'];
     
     case 'bottom-right':
-      return ['w', 'n', 'nw', 'cut-e', 'cut-s'];
+  // Bottom and right are cut: keep left & top edges, AND show right & bottom edge handles
+  return ['e', 's', 'w', 'n', 'cut-e', 'cut-s'];
     
     default:
       return ['e', 's', 'se'];
@@ -134,6 +138,39 @@ export function getResizeHandlePosition(
   lShape?: LShapeConfig
 ): { x: number; y: number; cursor: string } {
   const handleSize = 16;
+  
+  // If L-shaped, place standard edge handles within visible segments
+  if (lShape && ['e','s','w','n'].includes(handle)) {
+    const { cutCorner, cutWidth, cutHeight } = lShape;
+    const clampedCutWidth = Math.min(cutWidth, containerWidth - 20);
+    const clampedCutHeight = Math.min(cutHeight, containerHeight - 20);
+    switch (handle) {
+      case 'e': {
+        let y = containerHeight / 2;
+        if (cutCorner === 'top-right') y = clampedCutHeight + (containerHeight - clampedCutHeight) / 2;
+        if (cutCorner === 'bottom-right') y = (containerHeight - clampedCutHeight) / 2;
+        return { x: containerWidth, y, cursor: 'ew-resize' };
+      }
+      case 'w': {
+        let y = containerHeight / 2;
+        if (cutCorner === 'top-left') y = clampedCutHeight + (containerHeight - clampedCutHeight) / 2;
+        if (cutCorner === 'bottom-left') y = (containerHeight - clampedCutHeight) / 2;
+        return { x: 0, y, cursor: 'ew-resize' };
+      }
+      case 's': {
+        let x = containerWidth / 2;
+        if (cutCorner === 'bottom-right') x = (containerWidth - clampedCutWidth) / 2;
+        if (cutCorner === 'bottom-left') x = clampedCutWidth + (containerWidth - clampedCutWidth) / 2;
+        return { x, y: containerHeight, cursor: 'ns-resize' };
+      }
+      case 'n': {
+        let x = containerWidth / 2;
+        if (cutCorner === 'top-right') x = (containerWidth - clampedCutWidth) / 2;
+        if (cutCorner === 'top-left') x = clampedCutWidth + (containerWidth - clampedCutWidth) / 2;
+        return { x, y: 0, cursor: 'ns-resize' };
+      }
+    }
+  }
   
   // Standard handles
   switch (handle) {
