@@ -7,6 +7,7 @@ import { useTheme } from '../../theme/ThemeProvider';
 import { useGroups } from '@/contexts/GroupsContext';
 import { hexToRgba, autoTextColor } from '../diagram-helpers';
 import { getBrickTexture } from '../firewall-texture';
+import { FirewallIcon } from '../icons/FirewallIcon';
 import { effectiveBorderColor, effectiveBgColor, isAuto } from '../color-utils';
 import { ContainerShapeWrapper } from '../utils/ContainerShapeWrapper';
 
@@ -97,7 +98,9 @@ const ComponentNode = memo(({ id, data, selected, isConnectable }: ComponentNode
   const labelFg = autoTextColor(baseBg || '#ffffff');
   const handleSize = 16;
   const showHandles = isContainer && selected && !locked;
+  const { theme } = useTheme();
   const firewallLabel = String((data?.features?.firewallLabel ?? 'FIREWALL') || 'FIREWALL');
+  const firewallVariant = data?.features?.firewallVariant || 'default'; // 'default', 'secure', 'warning'
 
   const startResize = (e: React.MouseEvent, dir: string) => {
     if (!isContainer) return;
@@ -219,19 +222,27 @@ const ComponentNode = memo(({ id, data, selected, isConnectable }: ComponentNode
   const partitions = Math.max(1, Math.min(12, parseInt(String(data?.partitions ?? 1), 10) || 1));
   if (isContainer) {
     const tex = getBrickTexture();
+    const isDark = theme === 'dark';
+    const texUrlH = isDark && tex.urlHDark ? tex.urlHDark : tex.urlH;
+    
     return (
-      <div className="relative" style={{ width, height, ['--fwtexH' as any]: features?.firewall ? `url('${tex.urlH}')` : undefined, ['--fwtexV' as any]: features?.firewall ? `url('${tex.urlV}')` : undefined, ['--fwtexSize' as any]: features?.firewall ? `${tex.size}px ${tex.size}px` : undefined, ['--fwtexOffX' as any]: `${tex.offX}px`, ['--fwtexOffY' as any]: `${tex.offY}px`, ['--fwShiftTopY' as any]: `${tex.shiftTopY}px`, ['--fwShiftSideX' as any]: `${tex.shiftSideX}px`, ['--ringGapInner' as any]: '8px', ['--ringThickness' as any]: '14px' }}>
+      <div className="relative" style={{ 
+        width, height, 
+        ['--fwtexH' as any]: features?.firewall ? `url('${texUrlH}')` : undefined, 
+        ['--fwtexSize' as any]: features?.firewall ? `${tex.size}px ${tex.size}px` : undefined, 
+        ['--fwtexOffX' as any]: `${tex.offX}px`, 
+        ['--fwtexOffY' as any]: `${tex.offY}px`, 
+        ['--fwShiftTopY' as any]: `${tex.shiftTopY}px`, 
+        ['--fwShiftSideX' as any]: `${tex.shiftSideX}px`, 
+        ['--ringGapInner' as any]: '8px', 
+        ['--ringThickness' as any]: '14px' 
+      }}>
         {features?.firewall && (
           <div className="firewall-ring rounded-2xl">
             <div className="fw-top" />
-            <div className="fw-bottom" />
-            <div className="fw-left" />
-            <div className="fw-right" />
             <div className="fw-badge fw-badge--rect" title="Firewall activé" aria-label="firewall">
               <div className="fw-rect">
-                <svg viewBox="0 0 32 32" role="img" aria-hidden="true">
-                  <path d="M16 3 L27 7 V14 C27 20.5 22.5 25.7 16 29 C9.5 25.7 5 20.5 5 14 V7 Z" fill="#ffffff" stroke="#000000" strokeWidth="1.8" />
-                </svg>
+                <FirewallIcon size={24} variant={firewallVariant as any} />
               </div>
             </div>
             <div className="fw-label" aria-hidden="true">{firewallLabel}</div>
@@ -263,7 +274,7 @@ const ComponentNode = memo(({ id, data, selected, isConnectable }: ComponentNode
           )}
           {headerPos==='top' && (
           <div 
-            className="absolute top-0 left-0 right-0 flex items-center gap-3 px-3 py-2 bg-white/90 dark:bg-slate-900/70 backdrop-blur border-b" 
+            className="absolute top-0 left-0 right-0 flex items-center gap-3 px-3 py-2 bg-white/90 dark:bg-slate-900/70 backdrop-blur border-b rounded-t-2xl" 
             style={{ 
               borderColor: borderColor, 
               height: CONTAINER_HEADER_HEIGHT,
@@ -287,7 +298,7 @@ const ComponentNode = memo(({ id, data, selected, isConnectable }: ComponentNode
             </div>
           </div>)}
           {headerPos==='left' && (
-          <div className="absolute top-0 bottom-0 left-0 flex flex-col items-center justify-start gap-3 px-2 py-3 bg-white/90 dark:bg-slate-900/70 backdrop-blur border-r" style={{ borderColor: borderColor, width: CONTAINER_HEADER_HEIGHT }}>
+          <div className="absolute top-0 bottom-0 left-0 flex flex-col items-center justify-start gap-3 px-2 py-3 bg-white/90 dark:bg-slate-900/70 backdrop-blur border-r rounded-l-2xl" style={{ borderColor: borderColor, width: CONTAINER_HEADER_HEIGHT }}>
             {icon ? (
               <div className="h-8 w-8 rounded-xl bg-white/70 dark:bg-slate-800/70 border flex items-center justify-center overflow-hidden shadow-sm">
                 <img src={icon} alt="" className="max-h-7 max-w-7 object-contain" />
@@ -347,6 +358,8 @@ const ComponentNode = memo(({ id, data, selected, isConnectable }: ComponentNode
   }
 
   const tex = getBrickTexture();
+  const texUrlH = isDark && tex.urlHDark ? tex.urlHDark : tex.urlH;
+  
   // Service node width computation (applies to the service card only)
   let serviceWidth: number | undefined;
   if (widthMode === 'fixed') {
@@ -373,18 +386,22 @@ const ComponentNode = memo(({ id, data, selected, isConnectable }: ComponentNode
   }, [widthMode, label, features, icon, borderColor, customWidth]);
 
   return (
-    <div className="relative inline-block" style={{ ['--fwtexH' as any]: features?.firewall ? `url('${tex.urlH}')` : undefined, ['--fwtexV' as any]: features?.firewall ? `url('${tex.urlV}')` : undefined, ['--fwtexSize' as any]: features?.firewall ? `${tex.size}px ${tex.size}px` : undefined, ['--fwtexOffX' as any]: `${tex.offX}px`, ['--fwtexOffY' as any]: `${tex.offY}px`, ['--fwShiftTopY' as any]: `${tex.shiftTopY}px`, ['--fwShiftSideX' as any]: `${tex.shiftSideX}px`, ['--ringGapInner' as any]: '5px', ['--ringThickness' as any]: '12px' }}>
+    <div className="relative inline-block" style={{ 
+      ['--fwtexH' as any]: features?.firewall ? `url('${texUrlH}')` : undefined, 
+      ['--fwtexSize' as any]: features?.firewall ? `${tex.size}px ${tex.size}px` : undefined, 
+      ['--fwtexOffX' as any]: `${tex.offX}px`, 
+      ['--fwtexOffY' as any]: `${tex.offY}px`, 
+      ['--fwShiftTopY' as any]: `${tex.shiftTopY}px`, 
+      ['--fwShiftSideX' as any]: `${tex.shiftSideX}px`, 
+      ['--ringGapInner' as any]: '5px', 
+      ['--ringThickness' as any]: '12px' 
+    }}>
         {features?.firewall && (
           <div className="firewall-ring rounded-2xl">
             <div className="fw-top" />
-            <div className="fw-bottom" />
-            <div className="fw-left" />
-            <div className="fw-right" />
             <div className="fw-badge fw-badge--rect" title="Firewall activé" aria-label="firewall">
               <div className="fw-rect">
-                <svg viewBox="0 0 32 32" role="img" aria-hidden="true">
-                  <path d="M16 3 L27 7 V14 C27 20.5 22.5 25.7 16 29 C9.5 25.7 5 20.5 5 14 V7 Z" fill="#ffffff" stroke="#000000" strokeWidth="1.8" />
-                </svg>
+                <FirewallIcon size={24} variant={firewallVariant as any} />
               </div>
             </div>
             <div className="fw-label" aria-hidden="true">{firewallLabel}</div>

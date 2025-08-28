@@ -238,41 +238,162 @@
 .custom-edge .anchor-handle:hover { transform: scale(1.1); }
 .custom-edge .anchor-handle.dragging { cursor: grabbing; transform: scale(1.2); }
 
-/* Firewall ring styles (shared across nodes). Uses CSS variables set inline for textures and offsets. */
-.firewall-ring { position:absolute; inset:-8px; border-radius:1.35rem; pointer-events:none; z-index:1; }
-.firewall-ring .fw-top, .firewall-ring .fw-bottom, .firewall-ring .fw-left, .firewall-ring .fw-right {
-  position:absolute; background-repeat:repeat; background-size: var(--fwtexSize, 16px 16px);
+/* Firewall ring styles - Affichage moderne avec bordure supérieure uniquement */
+.firewall-ring { 
+  position: absolute; 
+  inset: -8px; 
+  border-radius: 1.35rem; 
+  pointer-events: none; 
+  z-index: 1;
 }
-.firewall-ring .fw-badge { position:absolute; top:-42px; left:-34px; pointer-events:none; isolation:isolate; transition:filter .25s ease, transform .25s ease; }
+
+/* Style pour la bordure supérieure uniquement - plus discret et moderne */
+.firewall-ring .fw-top {
+  position: absolute; 
+  background-repeat: repeat; 
+  background-size: var(--fwtexSize, 16px 16px);
+  
+  /* Amélioration visuelle avec ombres et effets */
+  box-shadow: 
+    inset 0 1px 0 rgba(255, 255, 255, 0.15),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.1),
+    0 2px 6px rgba(0, 0, 0, 0.2);
+  
+  /* Transition pour les changements de thème */
+  transition: all .3s ease;
+  
+  /* Positionnement et style spécifique pour la bordure supérieure */
+  top: calc(var(--ringGapInner, 2px) * -1); 
+  left: 0; 
+  right: 0; 
+  height: var(--ringThickness, 8px); 
+  border-top-left-radius: 1.35rem; 
+  border-top-right-radius: 1.35rem; 
+  background-image: var(--fwtexH); 
+  background-position: var(--fwtexOffX, 0) calc(var(--fwShiftTopY, 0));
+}
+
+/* Effets spéciaux pour le mode sombre - bordure supérieure uniquement */
+.dark .firewall-ring .fw-top {
+  box-shadow: 
+    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.25),
+    0 2px 6px rgba(0, 0, 0, 0.4);
+}
+
+/* Masquer les autres bordures - on ne garde que le haut */
+.firewall-ring .fw-bottom,
+.firewall-ring .fw-left,
+.firewall-ring .fw-right {
+  display: none;
+}
+
+/* Badge firewall moderne et professionnel */
+.firewall-ring .fw-badge { 
+  position:absolute; 
+  top:-28px; 
+  right:-28px; 
+  pointer-events:none; 
+  isolation:isolate; 
+  transition: all .3s cubic-bezier(0.4, 0, 0.2, 1);
+  z-index: 10;
+}
+
 .firewall-ring .fw-badge--rect .fw-rect {
-  height:58px; width:58px; border-radius:12px; display:flex; align-items:center; justify-content:center; overflow:hidden;
-  background:linear-gradient(160deg,#ffe4e6 0%,#fecdd3 38%,#fda4af 70%,#fb7185 100%);
-  color:#7a1111; border:2px solid #474747ff;
-  box-shadow: 0 8px 16px -6px rgba(0,0,0,0.28), 0 0 0 1px rgba(255,255,255,0.65) inset, 0 1px 0 0 rgba(255,255,255,0.85) inset, 0 -10px 16px -10px rgba(239,68,68,0.20) inset, 0 0 0 2px rgba(239,68,68,0.10);
-  backdrop-filter: blur(5px) saturate(1.35);
+  height: 44px; 
+  width: 44px; 
+  border-radius: 12px; 
+  display: flex; 
+  align-items: center; 
+  justify-content: center; 
+  position: relative;
+  
+  /* Design moderne avec gradient subtil */
+  background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 50%, #cbd5e1 100%);
+  border: 1.5px solid rgba(71, 85, 105, 0.2);
+  
+  /* Ombres sophistiquées */
+  box-shadow: 
+    0 4px 6px -1px rgba(0, 0, 0, 0.1),
+    0 2px 4px -1px rgba(0, 0, 0, 0.06),
+    0 0 0 1px rgba(255, 255, 255, 0.9) inset,
+    0 1px 0 0 rgba(255, 255, 255, 0.95) inset;
+  
+  /* Animation hover subtile */
+  transition: all .25s cubic-bezier(0.4, 0, 0.2, 1);
+  cursor: pointer;
 }
-.firewall-ring .fw-badge--rect .fw-rect svg { width:40px; height:40px; display:block; filter:drop-shadow(0 2px 3px rgba(0,0,0,0.4)); transform: translateY(1px); }
-.dark .firewall-ring .fw-badge--rect .fw-rect svg path { fill:#f4e8d1; }
+
+.firewall-ring .fw-badge--rect .fw-rect:hover {
+  transform: translateY(-1px) scale(1.05);
+  box-shadow: 
+    0 8px 25px -5px rgba(0, 0, 0, 0.15),
+    0 8px 10px -6px rgba(0, 0, 0, 0.1),
+    0 0 0 1px rgba(255, 255, 255, 0.9) inset,
+    0 1px 0 0 rgba(255, 255, 255, 0.95) inset;
+}
+
+.firewall-ring .fw-badge--rect .fw-rect svg { 
+  width: 24px; 
+  height: 24px; 
+  display: block; 
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.2));
+  transition: transform .25s ease;
+}
+
+.firewall-ring .fw-badge--rect .fw-rect:hover svg {
+  transform: scale(1.1);
+}
+
+/* Style dark mode */
 .dark .firewall-ring .fw-badge--rect .fw-rect {
-  background:linear-gradient(150deg,#78350f 0%,#9a3412 48%,#b45309 100%);
-  color:#fde68a; border:2px solid #f59e0b;
-  box-shadow: 0 8px 16px -6px rgba(0,0,0,0.6), 0 0 0 1px rgba(255,255,255,0.05), 0 1px 0 0 rgba(255,255,255,0.1) inset, 0 -10px 16px -10px rgba(146,64,14,0.35) inset;
+  background: linear-gradient(135deg, #334155 0%, #475569 50%, #64748b 100%);
+  border: 1.5px solid rgba(203, 213, 225, 0.1);
+  box-shadow: 
+    0 4px 6px -1px rgba(0, 0, 0, 0.3),
+    0 2px 4px -1px rgba(0, 0, 0, 0.2),
+    0 0 0 1px rgba(255, 255, 255, 0.05) inset,
+    0 1px 0 0 rgba(255, 255, 255, 0.1) inset;
+}
+
+.dark .firewall-ring .fw-badge--rect .fw-rect:hover {
+  box-shadow: 
+    0 8px 25px -5px rgba(0, 0, 0, 0.4),
+    0 8px 10px -6px rgba(0, 0, 0, 0.3),
+    0 0 0 1px rgba(255, 255, 255, 0.05) inset,
+    0 1px 0 0 rgba(255, 255, 255, 0.1) inset;
 }
 .firewall-ring .fw-label {
-  position:absolute; top:-31px; left:26px; height:20px; line-height:20px; pointer-events:none;
-  color:#7a1111; font-variant-caps: all-small-caps; font-weight:700; font-size:10px; letter-spacing:0.08em;
-  text-shadow:0 1px 0 rgba(255,255,255,0.65);
-  padding:0 8px; border-radius:999px; border:1px solid rgba(239,68,68,0.22);
-  background:linear-gradient(180deg, rgba(239,68,68,0.10), rgba(239,68,68,0.04));
-  box-shadow: 0 1px 2px rgba(0,0,0,0.07);
+  position: absolute; 
+  top: -18px; 
+  right: 18px; 
+  height: 18px; 
+  line-height: 18px; 
+  pointer-events: none;
+  
+  /* Style moderne et discret */
+  color: #475569; 
+  font-variant-caps: all-small-caps; 
+  font-weight: 600; 
+  font-size: 9px; 
+  letter-spacing: 0.1em;
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.8);
+  
+  padding: 0 6px; 
+  border-radius: 8px; 
+  border: 1px solid rgba(71, 85, 105, 0.15);
+  background: linear-gradient(180deg, rgba(248, 250, 252, 0.95), rgba(241, 245, 249, 0.85));
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+  backdrop-filter: blur(8px);
+  
+  transition: all .25s ease;
+  transform: translateX(0);
 }
+
 .dark .firewall-ring .fw-label {
-  color:#fde68a; text-shadow:0 1px 0 rgba(0,0,0,0.6);
-  border-color: rgba(245,158,11,0.38);
-  background:linear-gradient(180deg, rgba(245,158,11,0.22), rgba(245,158,11,0.10));
+  color: #cbd5e1; 
+  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.8);
+  border-color: rgba(203, 213, 225, 0.2);
+  background: linear-gradient(180deg, rgba(51, 65, 85, 0.95), rgba(71, 85, 105, 0.85));
 }
-.firewall-ring .fw-top { top: calc(var(--ringGapInner, 2px) * -1); left:0; right:0; height: var(--ringThickness, 8px); border-top-left-radius:1.35rem; border-top-right-radius:1.35rem; background-image: var(--fwtexH); background-position: var(--fwtexOffX, 0) calc(var(--fwShiftTopY, 0)); }
-.firewall-ring .fw-bottom { bottom: calc(var(--ringGapInner, 2px) * -1); left:0; right:0; height: var(--ringThickness, 8px); border-bottom-left-radius:1.35rem; border-bottom-right-radius:1.35rem; background-image: var(--fwtexH); background-position: var(--fwtexOffX, 0) calc(var(--fwShiftTopY, 0)); }
-.firewall-ring .fw-left { top:0; bottom:0; left: calc(var(--ringGapInner, 2px) * -1); width: var(--ringThickness, 8px); border-top-left-radius:1.35rem; border-bottom-left-radius:1.35rem; background-image: var(--fwtexV); background-position: calc(var(--fwShiftSideX, 0)) var(--fwtexOffX, 0); }
-.firewall-ring .fw-right { top:0; bottom:0; right: calc(var(--ringGapInner, 2px) * -1); width: var(--ringThickness, 8px); border-top-right-radius:1.35rem; border-bottom-right-radius:1.35rem; background-image: var(--fwtexV); background-position: calc(var(--fwShiftSideX, 0)) var(--fwtexOffX, 0); }
 

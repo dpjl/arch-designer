@@ -1,0 +1,1 @@
+export { FirewallIcon } from './FirewallIcon';
