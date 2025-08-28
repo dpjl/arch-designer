@@ -274,7 +274,7 @@ const ComponentNode = memo(({ id, data, selected, isConnectable }: ComponentNode
           )}
           {headerPos==='top' && (
           <div 
-            className="absolute top-0 left-0 right-0 flex items-center gap-3 px-3 py-2 bg-white/90 dark:bg-slate-900/70 backdrop-blur border-b" 
+            className="absolute top-0 left-0 right-0 flex items-center gap-3 px-3 py-2 bg-white/90 dark:bg-slate-900/70 backdrop-blur border-b rounded-t-2xl" 
             style={{ 
               borderColor: borderColor, 
               height: CONTAINER_HEADER_HEIGHT,
@@ -298,7 +298,7 @@ const ComponentNode = memo(({ id, data, selected, isConnectable }: ComponentNode
             </div>
           </div>)}
           {headerPos==='left' && (
-          <div className="absolute top-0 bottom-0 left-0 flex flex-col items-center justify-start gap-3 px-2 py-3 bg-white/90 dark:bg-slate-900/70 backdrop-blur border-r" style={{ borderColor: borderColor, width: CONTAINER_HEADER_HEIGHT }}>
+          <div className="absolute top-0 bottom-0 left-0 flex flex-col items-center justify-start gap-3 px-2 py-3 bg-white/90 dark:bg-slate-900/70 backdrop-blur border-r rounded-l-2xl" style={{ borderColor: borderColor, width: CONTAINER_HEADER_HEIGHT }}>
             {icon ? (
               <div className="h-8 w-8 rounded-xl bg-white/70 dark:bg-slate-800/70 border flex items-center justify-center overflow-hidden shadow-sm">
                 <img src={icon} alt="" className="max-h-7 max-w-7 object-contain" />
