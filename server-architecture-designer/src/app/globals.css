@@ -245,18 +245,6 @@
   border-radius: 1.35rem; 
   pointer-events: none; 
   z-index: 1;
-  
-  /* Animation subtile pour indiquer l'activité */
-  animation: firewallGlow 4s ease-in-out infinite;
-}
-
-@keyframes firewallGlow {
-  0%, 100% { 
-    filter: brightness(1) saturate(1);
-  }
-  50% { 
-    filter: brightness(1.05) saturate(1.1);
-  }
 }
 
 /* Style pour la bordure supérieure uniquement - plus discret et moderne */
@@ -309,18 +297,6 @@
   isolation:isolate; 
   transition: all .3s cubic-bezier(0.4, 0, 0.2, 1);
   z-index: 10;
-  animation: firewallPulse 3s ease-in-out infinite;
-}
-
-@keyframes firewallPulse {
-  0%, 100% { 
-    transform: scale(1) rotate(0deg); 
-    filter: brightness(1);
-  }
-  50% { 
-    transform: scale(1.02) rotate(1deg); 
-    filter: brightness(1.05);
-  }
 }
 
 .firewall-ring .fw-badge--rect .fw-rect {
@@ -419,24 +395,5 @@
   text-shadow: 0 1px 0 rgba(0, 0, 0, 0.8);
   border-color: rgba(203, 213, 225, 0.2);
   background: linear-gradient(180deg, rgba(51, 65, 85, 0.95), rgba(71, 85, 105, 0.85));
-}
-/* Animations pour l'icône firewall */
-.firewall-icon {
-  transition: all .3s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-.firewall-icon .firewall-pulse {
-  animation: firewallDot 2s ease-in-out infinite;
-}
-
-@keyframes firewallDot {
-  0%, 100% { 
-    opacity: 1;
-    transform: scale(1);
-  }
-  50% { 
-    opacity: 0.7;
-    transform: scale(0.9);
-  }
 }
 
