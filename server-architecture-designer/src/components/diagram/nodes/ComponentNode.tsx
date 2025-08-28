@@ -7,6 +7,7 @@ import { useTheme } from '../../theme/ThemeProvider';
 import { useGroups } from '@/contexts/GroupsContext';
 import { hexToRgba, autoTextColor } from '../diagram-helpers';
 import { getBrickTexture } from '../firewall-texture';
+import { FirewallIcon } from '../icons/FirewallIcon';
 import { effectiveBorderColor, effectiveBgColor, isAuto } from '../color-utils';
 import { ContainerShapeWrapper } from '../utils/ContainerShapeWrapper';
 
@@ -98,6 +99,7 @@ const ComponentNode = memo(({ id, data, selected, isConnectable }: ComponentNode
   const handleSize = 16;
   const showHandles = isContainer && selected && !locked;
   const firewallLabel = String((data?.features?.firewallLabel ?? 'FIREWALL') || 'FIREWALL');
+  const firewallVariant = data?.features?.firewallVariant || 'default'; // 'default', 'secure', 'warning'
 
   const startResize = (e: React.MouseEvent, dir: string) => {
     if (!isContainer) return;
@@ -229,9 +231,7 @@ const ComponentNode = memo(({ id, data, selected, isConnectable }: ComponentNode
             <div className="fw-right" />
             <div className="fw-badge fw-badge--rect" title="Firewall activé" aria-label="firewall">
               <div className="fw-rect">
-                <svg viewBox="0 0 32 32" role="img" aria-hidden="true">
-                  <path d="M16 3 L27 7 V14 C27 20.5 22.5 25.7 16 29 C9.5 25.7 5 20.5 5 14 V7 Z" fill="#ffffff" stroke="#000000" strokeWidth="1.8" />
-                </svg>
+                <FirewallIcon size={24} variant={firewallVariant as any} />
               </div>
             </div>
             <div className="fw-label" aria-hidden="true">{firewallLabel}</div>
@@ -382,9 +382,7 @@ const ComponentNode = memo(({ id, data, selected, isConnectable }: ComponentNode
             <div className="fw-right" />
             <div className="fw-badge fw-badge--rect" title="Firewall activé" aria-label="firewall">
               <div className="fw-rect">
-                <svg viewBox="0 0 32 32" role="img" aria-hidden="true">
-                  <path d="M16 3 L27 7 V14 C27 20.5 22.5 25.7 16 29 C9.5 25.7 5 20.5 5 14 V7 Z" fill="#ffffff" stroke="#000000" strokeWidth="1.8" />
-                </svg>
+                <FirewallIcon size={24} variant={firewallVariant as any} />
               </div>
             </div>
             <div className="fw-label" aria-hidden="true">{firewallLabel}</div>
